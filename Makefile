@@ -17,11 +17,6 @@ geth:
 	@echo "Done building."
 	@echo "Run \"$(GOBIN)/geth\" to launch geth."
 
-faucet:
-	$(GORUN) build/ci.go install ./cmd/faucet
-	@echo "Done building."
-	@echo "Run \"$(GOBIN)/faucet\" to launch faucet."
-
 all:
 	$(GORUN) build/ci.go install
 
@@ -160,3 +155,7 @@ geth-windows-amd64:
 	$(GORUN) build/ci.go xgo -- --go=$(GO) --targets=windows/amd64 -v ./cmd/geth
 	@echo "Windows amd64 cross compilation done:"
 	@ls -ld $(GOBIN)/geth-windows-* | grep amd64
+install: install-geth
+
+install-geth:
+	install -C ./build/bin/geth /usr/local/bin/geth

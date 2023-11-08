@@ -3,9 +3,3 @@
 build/_workspace
 build/_bin
 tests/testdata
-build/bin
-
-Dockerfile
-genesis/node_modules/
-genesis/.git/
-.git/
