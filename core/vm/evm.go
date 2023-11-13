@@ -235,7 +235,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		return nil, gas, ErrDepth
 	}
 
-	//// Fail if we're calling not whitelisted contract
+	// Fail if we're calling not whitelisted contract
 	//gas, err = applyChilizInvocationEvmHook(evm, addr, gas)
 	//if err != nil {
 	//	return nil, gas, err
