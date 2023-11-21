@@ -64,7 +64,7 @@ const (
 	initialBackOffTime = uint64(1) // second
 	processBackOffTime = uint64(1) // second
 
-	systemRewardPercent = 4 // it means 1/2^4 = 1/16 percentage of gas fee incoming will be distributed to system
+	systemRewardPercent = 3 // it means 1/2^4 = 1/16 percentage of gas fee incoming will be distributed to system
 )
 
 var (
@@ -1582,7 +1582,7 @@ func (p *Parlia) initContract(state *state.StateDB, header *types.Header, chain 
 
 func (p *Parlia) distributeToSystem(amount *big.Int, state *state.StateDB, header *types.Header, chain core.ChainContext,
 	txs *[]*types.Transaction, receipts *[]*types.Receipt, receivedTxs *[]*types.Transaction, usedGas *uint64, mining bool) error {
-	// get system message
+	// get a system message
 	msg := p.getSystemMessage(header.Coinbase, common.HexToAddress(systemcontract.SystemRewardContract), nil, amount)
 	// apply message
 	return p.applyTransaction(msg, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
@@ -1603,13 +1603,13 @@ func (p *Parlia) distributeToValidator(amount *big.Int, validator common.Address
 		log.Error("Unable to pack tx for deposit", "error", err)
 		return err
 	}
-	// get system message
+	// get a system message
 	msg := p.getSystemMessage(header.Coinbase, common.HexToAddress(systemcontract.ValidatorContract), data, amount)
 	// apply message
 	return p.applyTransaction(msg, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 }
 
-// get system message
+// get a system message
 func (p *Parlia) getSystemMessage(from, toAddress common.Address, data []byte, value *big.Int) callmsg {
 	return callmsg{
 		ethereum.CallMsg{
@@ -1755,7 +1755,8 @@ func (p *Parlia) GetFinalizedHeader(chain consensus.ChainHeaderReader, header *t
 	return FindAncientHeader(header, backward, chain, nil)
 }
 
-// ===========================     utility function        ==========================
+//	===========================     utility function        ==========================
+//
 // SealHash returns the hash of a block prior to it being sealed.
 func SealHash(header *types.Header, chainId *big.Int) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()
