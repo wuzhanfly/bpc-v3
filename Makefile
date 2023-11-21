@@ -155,7 +155,3 @@ geth-windows-amd64:
 	$(GORUN) build/ci.go xgo -- --go=$(GO) --targets=windows/amd64 -v ./cmd/geth
 	@echo "Windows amd64 cross compilation done:"
 	@ls -ld $(GOBIN)/geth-windows-* | grep amd64
-install: install-geth
-
-install-geth:
-	install -C ./build/bin/geth /usr/local/bin/geth

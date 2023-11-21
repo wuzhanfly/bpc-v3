@@ -22,10 +22,11 @@ import (
 	"io"
 	"sort"
 
+	"gopkg.in/urfave/cli.v1"
+
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/internal/debug"
 	"github.com/ethereum/go-ethereum/internal/flags"
-	"gopkg.in/urfave/cli.v1"
 )
 
 // AppHelpFlagGroups is the application flags, grouped by functionality.
@@ -44,11 +45,6 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.RangeLimitFlag,
 			utils.SmartCardDaemonPathFlag,
 			utils.NetworkIdFlag,
-			utils.MainnetFlag,
-			utils.GoerliFlag,
-			utils.RinkebyFlag,
-			utils.YoloV3Flag,
-			utils.RopstenFlag,
 			utils.SyncModeFlag,
 			utils.ExitWhenSyncedFlag,
 			utils.GCModeFlag,
@@ -60,6 +56,9 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.TriesInMemoryFlag,
 			utils.BlockAmountReserved,
 			utils.CheckSnapshotWithMPT,
+			utils.BLSPasswordFileFlag,
+			utils.BLSWalletDirFlag,
+			utils.VoteJournalDirFlag,
 		},
 	},
 	{
@@ -84,19 +83,6 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		},
 	},
 	{
-		Name: "ETHASH",
-		Flags: []cli.Flag{
-			utils.EthashCacheDirFlag,
-			utils.EthashCachesInMemoryFlag,
-			utils.EthashCachesOnDiskFlag,
-			utils.EthashCachesLockMmapFlag,
-			utils.EthashDatasetDirFlag,
-			utils.EthashDatasetsInMemoryFlag,
-			utils.EthashDatasetsOnDiskFlag,
-			utils.EthashDatasetsLockMmapFlag,
-		},
-	},
-	{
 		Name: "TRANSACTION POOL",
 		Flags: []cli.Flag{
 			utils.TxPoolLocalsFlag,
@@ -111,6 +97,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.TxPoolGlobalQueueFlag,
 			utils.TxPoolLifetimeFlag,
 			utils.TxPoolReannounceTimeFlag,
+			utils.TxPoolGasFreeContracts,
 		},
 	},
 	{
@@ -243,6 +230,12 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.BloomFilterSizeFlag,
 			cli.HelpFlag,
 			utils.CatalystFlag,
+		},
+	},
+	{
+		Name: "BLS ACCOUNT",
+		Flags: []cli.Flag{
+			utils.DataDirFlag,
 		},
 	},
 }

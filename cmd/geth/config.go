@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/config"
 	"math/big"
 	"os"
 	"reflect"
@@ -112,37 +111,6 @@ func defaultNodeConfig() node.Config {
 	return cfg
 }
 
-func readGenesisConfig(ctx *cli.Context) *core.Genesis {
-	// Chiliz Scoville just return already stored genesis config
-	if ctx.GlobalBool(utils.ChilizTestnetFlag.Name) {
-		return config.ScovilleGenesisConfig
-	}
-	// Chiliz Spicy just return already stored genesis config
-	if ctx.GlobalBool(utils.ChilizSpicyFlag.Name) {
-		return config.SpicyGenesisConfig
-	}
-	// Chiliz Mainnet just return already stored genesis config
-	if ctx.GlobalBool(utils.ChilizMainnetFlag.Name) {
-		return config.ChilizMainnetGenesisConfig
-	}
-	// Make sure we have a valid genesis JSON
-	genesisPath := ctx.GlobalString(utils.GenesisFlag.Name)
-	if len(genesisPath) == 0 {
-		utils.Fatalf("Must supply path to genesis JSON file")
-	}
-	file, err := os.Open(genesisPath)
-	if err != nil {
-		utils.Fatalf("Failed to read genesis file: %v", err)
-	}
-	//goland:noinspection GoUnhandledErrorResult
-	defer file.Close()
-	genesis := new(core.Genesis)
-	if err := json.NewDecoder(file).Decode(genesis); err != nil {
-		utils.Fatalf("invalid genesis file: %v", err)
-	}
-	return genesis
-}
-
 // makeConfigNode loads geth configuration and creates a blank node instance.
 func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 	// Load defaults.
@@ -159,7 +127,23 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 		}
 	}
 
-	cfg.Eth.Genesis = readGenesisConfig(ctx)
+	// Make sure we have a valid genesis JSON
+	genesisPath := ctx.GlobalString(utils.GenesisFlag.Name)
+	if len(genesisPath) == 0 {
+		utils.Fatalf("Must supply path to genesis JSON file")
+	}
+	file, err := os.Open(genesisPath)
+	if err != nil {
+		utils.Fatalf("Failed to read genesis file: %v", err)
+	}
+	//goland:noinspection GoUnhandledErrorResult
+	defer file.Close()
+
+	genesis := new(core.Genesis)
+	if err := json.NewDecoder(file).Decode(genesis); err != nil {
+		utils.Fatalf("invalid genesis file: %v", err)
+	}
+	cfg.Eth.Genesis = genesis
 
 	// Apply flags.
 	utils.SetNodeConfig(ctx, &cfg.Node)
@@ -179,7 +163,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 		if err != nil {
 			utils.Fatalf("Failed to open database: %v", err)
 		}
-		_, hash, err := core.SetupGenesisBlock(chaindb, cfg.Eth.Genesis)
+		_, hash, err := core.SetupGenesisBlock(chaindb, genesis)
 		if err != nil {
 			utils.Fatalf("Failed to write genesis block: %v", err)
 		}

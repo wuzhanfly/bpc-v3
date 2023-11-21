@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -38,6 +39,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/state/pruner"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/core/vote"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	"github.com/ethereum/go-ethereum/eth/filters"
@@ -97,6 +99,8 @@ type Ethereum struct {
 	p2pServer *p2p.Server
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
+
+	votePool *vote.VotePool
 }
 
 // New creates a new Ethereum object (including the
@@ -123,10 +127,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		config.TrieDirtyCache = 0
 	}
 	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
-
-	// Transfer mining-related config to the ethash config.
-	ethashConfig := config.Ethash
-	ethashConfig.NotifyFull = config.Miner.NotifyFull
 
 	// Assemble the Ethereum object
 	chainDb, err := stack.OpenAndMergeDatabase("chaindata", config.DatabaseCache, config.DatabaseHandles,
@@ -162,7 +162,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		log.Info("Unprotected transactions allowed")
 	}
 	ethAPI := ethapi.NewPublicBlockChainAPI(eth.APIBackend)
-	eth.engine = ethconfig.CreateConsensusEngine(stack, chainConfig, &ethashConfig, config.Miner.Notify, config.Miner.Noverify, chainDb, ethAPI, genesisHash)
+	eth.engine = ethconfig.CreateConsensusEngine(stack, chainConfig, config.Miner.Notify, config.Miner.Noverify, chainDb, ethAPI, genesisHash)
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
 	var dbVer = "<nil>"
@@ -200,7 +200,8 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		}
 	)
 	bcOps := make([]core.BlockChainOption, 0)
-	if config.DiffSync {
+	// TODO diffsync performance is not as expected, disable it when pipecommit is enabled for now
+	if config.DiffSync && !config.PipeCommit {
 		bcOps = append(bcOps, core.EnableLightProcessor)
 	}
 	if config.PipeCommit {
@@ -226,12 +227,33 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
+	conf := stack.Config()
+	blsPasswordPath := conf.BLSPasswordFile
+	blsWalletPath := filepath.Join(conf.DataDir, conf.BLSWalletDir)
+	voteJournalPath := stack.ResolvePath(conf.VoteJournalDir)
+
+	// Create voteManager instance
+	if posa, ok := eth.engine.(consensus.PoSA); ok {
+		// Create votePool instance
+		votePool := vote.NewVotePool(chainConfig, eth.blockchain, posa)
+		eth.votePool = votePool
+		if parlia, ok := eth.engine.(*parlia.Parlia); ok {
+			parlia.VotePool = votePool
+		} else {
+			return nil, fmt.Errorf("Engine is not Parlia type")
+		}
+		log.Info("Create votePool successfully")
+
+		if _, err := vote.NewVoteManager(eth.EventMux(), chainConfig, eth.blockchain, votePool, voteJournalPath, blsPasswordPath, blsWalletPath, posa); err != nil {
+			log.Error("Failed to Initialize voteManager", "error", err)
+			return nil, err
+		}
+		log.Info("Create voteManager successfully")
+	}
+
 	// Permit the downloader to use the trie cache allowance during fast sync
 	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit + cacheConfig.SnapshotLimit
 	checkpoint := config.Checkpoint
-	if checkpoint == nil {
-		checkpoint = params.TrustedCheckpoints[genesisHash]
-	}
 
 	if eth.handler, err = newHandler(&handlerConfig{
 		Database:               chainDb,
@@ -248,6 +270,9 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		DisablePeerTxBroadcast: config.DisablePeerTxBroadcast,
 	}); err != nil {
 		return nil, err
+	}
+	if eth.votePool != nil {
+		eth.handler.votepool = eth.votePool
 	}
 
 	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock)
@@ -535,6 +560,7 @@ func (s *Ethereum) Miner() *miner.Miner { return s.miner }
 func (s *Ethereum) AccountManager() *accounts.Manager  { return s.accountManager }
 func (s *Ethereum) BlockChain() *core.BlockChain       { return s.blockchain }
 func (s *Ethereum) TxPool() *core.TxPool               { return s.txPool }
+func (s *Ethereum) VotePool() *vote.VotePool           { return s.votePool }
 func (s *Ethereum) EventMux() *event.TypeMux           { return s.eventMux }
 func (s *Ethereum) Engine() consensus.Engine           { return s.engine }
 func (s *Ethereum) ChainDb() ethdb.Database            { return s.chainDb }

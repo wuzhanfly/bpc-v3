@@ -17,9 +17,7 @@
 package miner
 
 import (
-	"bytes"
 	"errors"
-	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,7 +26,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/consensus/parlia"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -130,6 +127,7 @@ type intervalAdjust struct {
 // worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type worker struct {
+	prefetcher  core.Prefetcher
 	config      *Config
 	chainConfig *params.ChainConfig
 	engine      consensus.Engine
@@ -196,6 +194,7 @@ type worker struct {
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool, init bool) *worker {
 	worker := &worker{
+		prefetcher:         core.NewStatePrefetcher(chainConfig, eth.BlockChain(), engine),
 		config:             config,
 		chainConfig:        chainConfig,
 		engine:             engine,
@@ -405,7 +404,7 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 		case <-timer.C:
 			// If mining is running resubmit a new work cycle periodically to pull in
 			// higher priced transactions. Disable this overhead for pending blocks.
-			if w.isRunning() && ((w.chainConfig.Ethash != nil) || (w.chainConfig.Clique != nil &&
+			if w.isRunning() && ((w.chainConfig.Clique != nil &&
 				w.chainConfig.Clique.Period > 0) || (w.chainConfig.Parlia != nil && w.chainConfig.Parlia.Period > 0)) {
 				// Short circuit if no new transaction arrives.
 				if atomic.LoadInt32(&w.newTxs) == 0 {
@@ -659,7 +658,7 @@ func (w *worker) resultLoop() {
 func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	// Retrieve the parent state to execute on top and start a prefetcher for
 	// the miner to speed block sealing up a bit
-	state, err := w.chain.StateAt(parent.Root())
+	state, err := w.chain.StateAtWithSharedPool(parent.Root())
 	if err != nil {
 		return err
 	}
@@ -759,7 +758,12 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 
 	if w.current.gasPool == nil {
 		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
-		w.current.gasPool.SubGas(params.SystemTxsGas)
+		if w.chain.Config().IsEuler(w.current.header.Number) {
+			w.current.gasPool.SubGas(params.SystemTxsGas * 3)
+		} else {
+			w.current.gasPool.SubGas(params.SystemTxsGas)
+		}
+
 	}
 
 	var coalescedLogs []*types.Log
@@ -777,6 +781,14 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		processorCapacity = txs.CurrentSize()
 	}
 	bloomProcessors := core.NewAsyncReceiptBloomGenerator(processorCapacity)
+
+	interruptCh := make(chan struct{})
+	defer close(interruptCh)
+	//prefetch txs from all pending txs
+	txsPrefetch := txs.Copy()
+	tx := txsPrefetch.Peek()
+	txCurr := &tx
+	w.prefetcher.PrefetchMining(txsPrefetch, w.current.header, w.current.gasPool.Gas(), w.current.state.Copy(), *w.chain.GetVMConfig(), interruptCh, txCurr)
 
 LOOP:
 	for {
@@ -814,7 +826,7 @@ LOOP:
 			}
 		}
 		// Retrieve the next transaction and abort if all done
-		tx := txs.Peek()
+		tx = txs.Peek()
 		if tx == nil {
 			break
 		}
@@ -924,29 +936,11 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		log.Warn("Failed to prepare header for mining", "err", err, "number", header.Number.Uint64())
 		return
 	}
-	// If we are care about TheDAO hard-fork check whether to override the extra-data or not
-	if daoBlock := w.chainConfig.DAOForkBlock; daoBlock != nil {
-		// Check whether the block is among the fork extra-override range
-		limit := new(big.Int).Add(daoBlock, params.DAOForkExtraRange)
-		if header.Number.Cmp(daoBlock) >= 0 && header.Number.Cmp(limit) < 0 {
-			// Depending whether we support or oppose the fork, override differently
-			if w.chainConfig.DAOForkSupport {
-				header.Extra = common.CopyBytes(params.DAOForkBlockExtra)
-			} else if bytes.Equal(header.Extra, params.DAOForkBlockExtra) {
-				header.Extra = []byte{} // If miner opposes, don't let it use the reserved extra-data
-			}
-		}
-	}
 	// Could potentially happen if starting to mine in an odd state.
 	err := w.makeCurrent(parent, header)
 	if err != nil {
 		log.Error("Failed to create mining context", "err", err)
 		return
-	}
-	// Create the current work task and check any fork transitions needed
-	env := w.current
-	if w.chainConfig.DAOForkSupport && w.chainConfig.DAOForkBlock != nil && w.chainConfig.DAOForkBlock.Cmp(header.Number) == 0 {
-		misc.ApplyDAOHardFork(env.state)
 	}
 	// Accumulate the uncles for the current block
 	uncles := make([]*types.Header, 0)
@@ -987,7 +981,11 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 		commitTxsTimer.UpdateSince(start)
 		log.Info("Gas pool", "height", header.Number.String(), "pool", w.current.gasPool.String())
 	}
-	w.commit(uncles, w.fullTaskHook, false, tstart)
+	err = w.commit(uncles, w.fullTaskHook, false, tstart)
+	if err != nil {
+		log.Error("Failed to commit mining block", "err", err)
+		return
+	}
 }
 
 // commit runs any post-transaction state modifications, assembles the final block
@@ -998,6 +996,9 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 	if err != nil {
 		return err
 	}
+
+	s.CorrectAccountsRoot(w.chain.CurrentBlock().Root())
+
 	block, receipts, err := w.engine.FinalizeAndAssemble(w.chain, types.CopyHeader(w.current.header), s, w.current.txs, uncles, w.current.receipts)
 	if err != nil {
 		return err

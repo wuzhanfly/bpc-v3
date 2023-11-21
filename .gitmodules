@@ -1,4 +1,0 @@
-[submodule "genesis"]
-	path = genesis
-	url = git@github.com:wuzhanfly/bpc-genesis-config-v2.git
-	branch = main

@@ -23,13 +23,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	systemcontract2 "github.com/ethereum/go-ethereum/core/vm/systemcontract"
-
-	"github.com/holiman/uint256"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already
@@ -52,18 +49,11 @@ type (
 	GetHashFunc func(uint64) common.Hash
 )
 
-func (evm *EVM) precompile(addr, caller common.Address) (PrecompiledContract, bool) {
-	evmHook := systemcontract2.CreateEvmHook(addr, systemcontract2.EvmHookContext{
-		CallerAddress: caller,
-		StateDb:       evm.StateDB,
-		ChainConfig:   evm.chainConfig,
-		ChainRules:    evm.chainRules,
-	})
-	if evmHook != nil {
-		return evmHook, true
-	}
+func (evm *EVM) precompile(addr common.Address) (PrecompiledContract, bool) {
 	var precompiles map[common.Address]PrecompiledContract
 	switch {
+	case evm.chainRules.IsBoneh:
+		precompiles = PrecompiledContractsBoneh
 	case evm.chainRules.IsBerlin:
 		precompiles = PrecompiledContractsBerlin
 	case evm.chainRules.IsIstanbul:
@@ -73,6 +63,7 @@ func (evm *EVM) precompile(addr, caller common.Address) (PrecompiledContract, bo
 	default:
 		precompiles = PrecompiledContractsHomestead
 	}
+	enableBasContracts(precompiles, evm.chainRules)
 	p, ok := precompiles[addr]
 	return p, ok
 }
@@ -234,19 +225,12 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, gas, ErrDepth
 	}
-
-	// Fail if we're calling not whitelisted contract
-	//gas, err = applyChilizInvocationEvmHook(evm, addr, gas)
-	//if err != nil {
-	//	return nil, gas, err
-	//}
-
 	// Fail if we're trying to transfer more than the available balance
 	if value.Sign() != 0 && !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, gas, ErrInsufficientBalance
 	}
 	snapshot := evm.StateDB.Snapshot()
-	p, isPrecompile := evm.precompile(addr, caller.Address())
+	p, isPrecompile := evm.precompile(addr)
 
 	if !evm.StateDB.Exist(addr) {
 		if !isPrecompile && evm.chainRules.IsEIP158 && value.Sign() == 0 {
@@ -348,7 +332,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 	}
 
 	// It is allowed to call precompiles, even via delegatecall
-	if p, isPrecompile := evm.precompile(addr, caller.Address()); isPrecompile {
+	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else {
 		addrCopy := addr
@@ -392,7 +376,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 	}
 
 	// It is allowed to call precompiles, even via delegatecall
-	if p, isPrecompile := evm.precompile(addr, caller.Address()); isPrecompile {
+	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else {
 		addrCopy := addr
@@ -444,7 +428,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		}(gas)
 	}
 
-	if p, isPrecompile := evm.precompile(addr, caller.Address()); isPrecompile {
+	if p, isPrecompile := evm.precompile(addr); isPrecompile {
 		ret, gas, err = RunPrecompiledContract(p, input, gas)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
@@ -489,16 +473,6 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.depth > int(params.CallCreateDepth) {
 		return nil, common.Address{}, gas, ErrDepth
 	}
-
-	// Make sure it's allowed to deploy smart contracts
-	//if !evm.chainRules.HasDeploymentHookFix {
-	//	var err error
-	//	gas, err = applyChilizDeploymentEvmHook(evm, caller, address, gas)
-	//	if err != nil {
-	//		return nil, common.Address{}, gas, err
-	//	}
-	//}
-
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
 		return nil, common.Address{}, gas, ErrInsufficientBalance
 	}
@@ -514,16 +488,6 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	if evm.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
 		return nil, common.Address{}, 0, ErrContractAddressCollision
 	}
-
-	// Make sure it's allowed to deploy smart contracts
-	//if evm.chainRules.HasDeploymentHookFix {
-	//	var err error
-	//	gas, err = applyChilizDeploymentEvmHook(evm, caller, address, gas)
-	//	if err != nil {
-	//		return nil, common.Address{}, gas, err
-	//	}
-	//}
-
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()
 	evm.StateDB.CreateAccount(address)
@@ -598,8 +562,8 @@ func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.I
 }
 
 // CreateWithAddress creates a new contract using code as deployment code.
-func (evm *EVM) CreateWithAddress(caller ContractRef, code []byte, gas uint64, value *big.Int, contractAddr common.Address) (ret []byte, leftOverGas uint64, err error) {
-	ret, _, leftOverGas, err = evm.create(caller, &codeAndHash{code: code}, gas, value, contractAddr, STOP)
+func (evm *EVM) CreateWithAddress(caller common.Address, code []byte, gas uint64, value *big.Int, contractAddr common.Address) (ret []byte, leftOverGas uint64, err error) {
+	ret, _, leftOverGas, err = evm.create(AccountRef(caller), &codeAndHash{code: code}, gas, value, contractAddr, STOP)
 	return
 }
 
