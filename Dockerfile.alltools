@@ -9,7 +9,7 @@ FROM golang:1.17-alpine3.16 as builder
 RUN apk add --no-cache make gcc musl-dev linux-headers git bash
 
 ADD . /go-ethereum
-RUN cd /go-ethereum && make all-static
+RUN cd /go-ethereum && make all
 
 # Pull all binaries into a second stage deploy alpine container
 FROM alpine:3.16
