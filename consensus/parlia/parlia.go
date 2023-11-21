@@ -51,9 +51,9 @@ const (
 	checkpointInterval = 1024        // Number of blocks after which to save the snapshot to the database
 	defaultEpochLength = uint64(100) // Default number of blocks of checkpoint to update validatorSet from contract
 
-	extraVanity      = 32 // Fixed number of extra-data prefix bytes reserved for signer vanity
-	extraSeal        = 65 // Fixed number of extra-data suffix bytes reserved for signer seal
-	nextForkHashSize = 4  // Fixed number of extra-data suffix bytes reserved for nextForkHash.
+	extraVanity      = 32 // Fixed number of extra-data prefixes bytes reserved for signer vanity
+	extraSeal        = 65 // Fixed number of extra-data suffixes bytes reserved for signer seal
+	nextForkHashSize = 4  // Fixed the number of extra-data suffixes bytes reserved for nextForkHash.
 
 	validatorBytesLength           = common.AddressLength
 	validatorBytesLengthAfterBoneh = common.AddressLength + types.BLSPublicKeyLength
@@ -64,7 +64,7 @@ const (
 	initialBackOffTime = uint64(1) // second
 	processBackOffTime = uint64(1) // second
 
-	systemRewardPercent = 3 // it means 1/2^4 = 1/16 percentage of gas fee incoming will be distributed to system
+	systemRewardPercent = 3 // it means 1/2^4 = 1/16 percentage of gas fee incoming will be distributed to a system
 )
 
 var (
@@ -76,7 +76,7 @@ var (
 )
 
 // Various error messages to mark blocks invalid. These should be private to
-// prevent engine specific errors from being referenced in the remainder of the
+// prevent engine-specific errors from being referenced in the remainder of the
 // codebase, inherently breaking if the engine is swapped out. Please put common
 // error types into the consensus package.
 var (
@@ -92,22 +92,22 @@ var (
 	// to contain a 65 byte secp256k1 signature.
 	errMissingSignature = errors.New("extra-data 65 byte signature suffix missing")
 
-	// errExtraValidators is returned if non-sprint-end block contain validator data in
+	// errExtraValidators is returned if non-sprint-end block contains validator data in
 	// their extra-data fields.
 	errExtraValidators = errors.New("non-sprint-end block contains extra validator list")
 
 	// errInvalidSpanValidators is returned if a block contains an
-	// invalid list of validators (i.e. non divisible by 20 bytes).
+	// invalid list of validators (i.e., non-divisible by 20 bytes).
 	errInvalidSpanValidators = errors.New("invalid validator list on sprint end block")
 
 	// errInvalidMixDigest is returned if a block's mix digest is non-zero.
 	errInvalidMixDigest = errors.New("non-zero mix digest")
 
-	// errInvalidUncleHash is returned if a block contains an non-empty uncle list.
+	// errInvalidUncleHash is returned if a block contains a non-empty uncle list.
 	errInvalidUncleHash = errors.New("non empty uncle hash")
 
 	// errMismatchingEpochValidators is returned if a sprint block contains a
-	// list of validators different than the one the local node calculated.
+	// list of validators different from the one the local node calculated.
 	errMismatchingEpochValidators = errors.New("mismatching validator list on epoch block")
 
 	// errInvalidDifficulty is returned if the difficulty of a block is missing.
@@ -170,8 +170,8 @@ func ecrecover(header *types.Header, sigCache *lru.ARCCache, chainId *big.Int) (
 	return signer, nil
 }
 
-// ParliaRLP returns the rlp bytes which needs to be signed for the parlia
-// sealing. The RLP to sign consists of the entire header apart from the 65 byte signature
+// ParliaRLP returns the rlp bytes which need to be signed for the parlia
+// sealing. The RLP to sign consists of the entire header apart from the 65-byte signature
 // contained at the end of the extra data.
 //
 // Note, the method requires the extra data to be at least 65 bytes, otherwise it
@@ -297,7 +297,7 @@ func (p *Parlia) VerifyHeader(chain consensus.ChainHeaderReader, header *types.H
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers. The
-// method returns a quit channel to abort the operations and a results channel to
+// method returns a quit channel to abort the operations and a result channel to
 // retrieve the async verifications (the order is that of the input slice).
 func (p *Parlia) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
 	abort := make(chan struct{})
@@ -317,9 +317,9 @@ func (p *Parlia) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*typ
 	return abort, results
 }
 
-// getValidatorBytesFromHeader returns the validators bytes extracted from the header's extra field if exists.
-// The validators bytes would be contained only in the epoch block's header, and its each validator bytes length is fixed.
-// On boneh fork, we introduce vote attestation into the header's extra field, so extra format is different from before.
+// getValidatorBytesFromHeader returns the validator bytes extracted from the header's extra field if exists.
+// The validator bytes would be contained only in the epoch block's header, and its each validator bytes length is fixed.
+// On boneh fork, we introduce vote attestation into the header's extra field, so an extra format is different from before.
 // Before boneh fork: |---Extra Vanity---|---Validators Bytes (or Empty)---|---Extra Seal---|
 // After boneh fork:  |---Extra Vanity---|---Validators Number and Validators Bytes (or Empty)---|---Vote Attestation (or Empty)---|---Extra Seal---|
 func getValidatorBytesFromHeader(header *types.Header, chainConfig *params.ChainConfig, parliaConfig *params.ParliaConfig) []byte {
@@ -462,7 +462,7 @@ func (p *Parlia) verifyVoteAttestation(chain consensus.ChainHeaderReader, header
 		votedAddrs = append(votedAddrs, voteAddr)
 	}
 
-	// The valid voted validators should be no less than 2/3 validators.
+	// The valid-voted validators should be no less than 2/3 validators.
 	if len(votedAddrs) <= len(snap.Validators)*2/3 {
 		return fmt.Errorf("invalid attestation, not enough validators voted")
 	}
@@ -657,7 +657,7 @@ func (p *Parlia) snapshot(chain consensus.ChainHeaderReader, number uint64, hash
 			}
 			parents = parents[:len(parents)-1]
 		} else {
-			// No explicit parents (or no more left), reach out to the database
+			// No explicit parents (or no lefter), reach out to the database
 			header = chain.GetHeader(hash, number)
 			if header == nil {
 				return nil, consensus.ErrUnknownAncestor
@@ -1045,7 +1045,7 @@ func (p *Parlia) Finalize(chain consensus.ChainHeaderReader, header *types.Heade
 
 	cx := chainContext{Chain: chain, parlia: p}
 
-	// No block rewards in PoA, so the state remains as is and uncles are dropped
+	// No block rewards in Poá, so the state remains as is, and uncles are dropped
 	if header.Number.Cmp(common.Big1) == 0 {
 		err := p.initContract(state, header, cx, txs, receipts, systemTxs, usedGas, false)
 		if err != nil {
@@ -1092,7 +1092,7 @@ func (p *Parlia) Finalize(chain consensus.ChainHeaderReader, header *types.Heade
 // nor block rewards given, and returns the final block.
 func (p *Parlia) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB,
 	txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, []*types.Receipt, error) {
-	// No block rewards in PoA, so the state remains as is and uncles are dropped
+	// No block rewards in Poá, so the state remains as is, and uncles are dropped
 	cx := chainContext{Chain: chain, parlia: p}
 	if txs == nil {
 		txs = make([]*types.Transaction, 0)
@@ -1214,7 +1214,7 @@ func (p *Parlia) VerifyVote(chain consensus.ChainHeaderReader, vote *types.VoteE
 	return fmt.Errorf("vote verification failed")
 }
 
-// Authorize injects a private key into the consensus engine to mint new blocks
+// Authorize injections a private key into the consensus engine to mint new blocks
 // with.
 func (p *Parlia) Authorize(val common.Address, signFn SignerFn, signTxFn SignerTxFn) {
 	p.lock.Lock()
@@ -1232,7 +1232,7 @@ func (p *Parlia) Delay(chain consensus.ChainReader, header *types.Header) *time.
 		return nil
 	}
 	delay := p.delayForRamanujanFork(snap, header)
-	// The blocking time should be no more than half of period
+	// The blocking time should be no more than half of the period
 	half := time.Duration(p.config.Period) * time.Second / 2
 	if delay > half {
 		delay = half
@@ -1426,7 +1426,7 @@ func (p *Parlia) SealHash(header *types.Header) (hash common.Hash) {
 	return hash
 }
 
-// APIs implements consensus.Engine, returning the user facing RPC API to query snapshot.
+// APIs implement consensus.Engine, returning the user facing RPC API to query snapshot.
 func (p *Parlia) APIs(chain consensus.ChainHeaderReader) []rpc.API {
 	return []rpc.API{{
 		Namespace: "parlia",
@@ -1491,6 +1491,16 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash, blockNum *big.Int) 
 	return valSet, voteAddrmap, nil
 }
 
+func (p *Parlia) BlockRewards(blockNumber *big.Int) *big.Int {
+	if rules := p.chainConfig.Rules(blockNumber); rules.HasBlockRewards {
+		blockRewards := p.chainConfig.Parlia.BlockRewards
+		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
+			return blockRewards
+		}
+	}
+	return nil
+}
+
 // slash spoiled validators
 func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, header *types.Header, chain core.ChainContext,
 	txs *[]*types.Transaction, receipts *[]*types.Receipt, receivedTxs *[]*types.Transaction, usedGas *uint64, mining bool) error {
@@ -1501,29 +1511,35 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	}
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
-
+	rewards := big.NewInt(0).Abs(balance)
 	if rules := p.chainConfig.Rules(header.Number); rules.HasBlockRewards {
 		blockRewards := p.chainConfig.Parlia.BlockRewards
 		// if we have enabled block rewards and rewards are greater than 0 then
 		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
 			state.AddBalance(coinbase, blockRewards)
+			rewards = rewards.Add(rewards, blockRewards)
 		}
 	}
 
-	doDistributeSysReward := state.GetBalance(common.HexToAddress(systemcontract.SystemRewardContract)).Cmp(maxSystemBalance) < 0
-	if doDistributeSysReward {
-		var rewards = new(big.Int)
-		rewards = rewards.Rsh(balance, systemRewardPercent)
-		if rewards.Cmp(common.Big0) > 0 {
-			err := p.distributeToSystem(rewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
-			if err != nil {
-				return err
+	if rewards.Cmp(common.Big0) <= 0 {
+		return nil
+	}
+	if balance.Cmp(common.Big0) > 0 {
+		doDistributeSysReward := state.GetBalance(common.HexToAddress(systemcontract.SystemRewardContract)).Cmp(maxSystemBalance) < 0
+		if doDistributeSysReward {
+			var sysRewards = new(big.Int)
+			sysRewards = sysRewards.Rsh(balance, systemRewardPercent)
+			if sysRewards.Cmp(common.Big0) > 0 {
+				err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
+				if err != nil {
+					return err
+				}
+				log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
+				rewards = rewards.Sub(rewards, sysRewards)
 			}
-			log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", rewards)
-			balance = balance.Sub(balance, rewards)
 		}
 	}
-	log.Trace("distribute to validator contract", "block hash", header.Hash(), "amount", balance)
+	log.Trace("distribute to validator contract", "block hash", header.Hash(), "amount", rewards)
 	return p.distributeToValidator(balance, val, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 }
 
@@ -1541,7 +1557,7 @@ func (p *Parlia) slash(spoiledVal common.Address, state *state.StateDB, header *
 		log.Error("Unable to pack tx for slash", "error", err)
 		return err
 	}
-	// get system message
+	// get a system message
 	msg := p.getSystemMessage(header.Coinbase, common.HexToAddress(systemcontract.SlashContract), data, common.Big0)
 	// apply message
 	return p.applyTransaction(msg, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
@@ -1714,13 +1730,13 @@ func (p *Parlia) GetJustifiedHeader(chain consensus.ChainHeaderReader, header *t
 	if snap.Number-snap.Attestation.TargetNumber > naturallyJustifiedDist {
 		return FindAncientHeader(header, naturallyJustifiedDist, chain, nil)
 	}
-	//Return latest vote justified block.
+	//Return the latest vote justified block.
 	return chain.GetHeaderByHash(snap.Attestation.TargetHash)
 }
 
 // GetFinalizedHeader returns highest finalized block header before the specific block.
-// It will first to find vote finalized block within the specific backward blocks, the suggested backward blocks is 21.
-// If the vote finalized block not found, return its previous backward block.
+// It will first to find vote finalized block within the specific backward blocks, the suggested backward blocks are 21.
+// If the vote finalized block is not found, return its previous backward block.
 func (p *Parlia) GetFinalizedHeader(chain consensus.ChainHeaderReader, header *types.Header, backward uint64) *types.Header {
 	if chain == nil || header == nil {
 		return nil
@@ -1755,8 +1771,6 @@ func (p *Parlia) GetFinalizedHeader(chain consensus.ChainHeaderReader, header *t
 	return FindAncientHeader(header, backward, chain, nil)
 }
 
-//	===========================     utility function        ==========================
-//
 // SealHash returns the hash of a block prior to it being sealed.
 func SealHash(header *types.Header, chainId *big.Int) (hash common.Hash) {
 	hasher := sha3.NewLegacyKeccak256()

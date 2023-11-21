@@ -655,10 +655,10 @@ func (s *PublicBlockChainAPI) GetHeaderByHash(ctx context.Context, hash common.H
 }
 
 // GetBlockByNumber returns the requested canonical block.
-// * When blockNr is -1 the chain head is returned.
-// * When blockNr is -2 the pending chain head is returned.
-// * When fullTx is true all transactions in the block are returned, otherwise
-//   only the transaction hash is returned.
+//   - When blockNr is -1 the chain head is returned.
+//   - When blockNr is -2 the pending chain head is returned.
+//   - When fullTx is true all transactions in the block are returned, otherwise
+//     only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, number rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.BlockByNumber(ctx, number)
 	if block != nil && err == nil {
@@ -1232,6 +1232,10 @@ func (s *PublicBlockChainAPI) replay(ctx context.Context, block *types.Block, ac
 				if balance.Cmp(common.Big0) > 0 {
 					statedb.SetBalance(consensus.SystemAddress, big.NewInt(0))
 					statedb.AddBalance(block.Header().Coinbase, balance)
+				}
+				blockRewards := posa.BlockRewards(block.Header().Number)
+				if blockRewards != nil {
+					statedb.AddBalance(context.Coinbase, blockRewards)
 				}
 			}
 		}

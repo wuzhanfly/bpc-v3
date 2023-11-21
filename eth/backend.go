@@ -240,7 +240,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		if parlia, ok := eth.engine.(*parlia.Parlia); ok {
 			parlia.VotePool = votePool
 		} else {
-			return nil, fmt.Errorf("Engine is not Parlia type")
+			return nil, fmt.Errorf("engine is not Parlia type")
 		}
 		log.Info("Create votePool successfully")
 

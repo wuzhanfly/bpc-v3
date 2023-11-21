@@ -153,4 +153,6 @@ type PoSA interface {
 	GetFinalizedHeader(chain ChainHeaderReader, header *types.Header, backward uint64) *types.Header
 	VerifyVote(chain ChainHeaderReader, vote *types.VoteEnvelope) error
 	IsActiveValidatorAt(chain ChainHeaderReader, header *types.Header) bool
+
+	BlockRewards(blockNumber *big.Int) *big.Int
 }

@@ -20,7 +20,7 @@ const (
 	CrossChainContract         = "0x0000000000000000000000000000000000002000"
 )
 
-// BAS contacts
+// bpc contacts
 const (
 	StakingPoolContract    = "0x0000000000000000000000000000000000007001"
 	GovernanceContract     = "0x0000000000000000000000000000000000007002"
