@@ -405,10 +405,10 @@ func blsAccountList(ctx *cli.Context) error {
 		utils.Fatalf("BLS wallet not exists.")
 	}
 
-	//walletPassword := utils.GetPassPhrase("Enter the password for your BLS wallet.", false)
+	walletPassword := utils.GetPassPhrase("Enter the password for your BLS wallet.", false)
 	w, err := wallet.OpenWallet(context.Background(), &wallet.Config{
 		WalletDir:      walletDir,
-		WalletPassword: "12345678",
+		WalletPassword: walletPassword,
 	})
 	if err != nil {
 		utils.Fatalf("Open BLS wallet failed: %v.", err)
