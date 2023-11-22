@@ -4,20 +4,17 @@ ARG VERSION=""
 ARG BUILDNUM=""
 
 # Build Geth in a stock Go builder container
-FROM golang:1.17-alpine as builder
+FROM golang:1.17-alpine3.16 as builder
 
 RUN apk add --no-cache make gcc musl-dev linux-headers git build-base libc-dev bash
-
-# Get dependencies - will also be cached if we won't change go.mod/go.sum
-COPY go.mod /go-ethereum/
-COPY go.sum /go-ethereum/
-RUN cd /go-ethereum && go mod download
-
 ADD . /go-ethereum
-RUN cd /go-ethereum && go run build/ci.go install ./cmd/geth
+
+ENV CGO_CFLAGS="-O -D__BLST_PORTABLE__"
+ENV CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
+RUN cd /go-ethereum && make all-static
 
 # Pull Geth into a second stage deploy alpine container
-FROM alpine:3.17
+FROM alpine:3.16
 
 ARG BSC_USER=bsc
 ARG BSC_USER_UID=1000
@@ -29,13 +26,16 @@ ENV DATA_DIR=/data
 
 ENV PACKAGES ca-certificates jq \
   bash bind-tools tini \
-  grep curl sed
+  grep curl sed gcc
 
 RUN apk add --no-cache $PACKAGES \
   && rm -rf /var/cache/apk/* \
   && addgroup -g ${BSC_USER_GID} ${BSC_USER} \
   && adduser -u ${BSC_USER_UID} -G ${BSC_USER} --shell /bin/bash --no-create-home -D ${BSC_USER} \
-  && addgroup ${BSC_USER} tty
+  && addgroup ${BSC_USER} tty \
+  && sed -i -e "s/bin\/sh/bin\/bash/" /etc/passwd
+
+RUN echo "[ ! -z \"\$TERM\" -a -r /etc/motd ] && cat /etc/motd" >> /etc/bash/bashrc
 
 WORKDIR ${BSC_HOME}
 
