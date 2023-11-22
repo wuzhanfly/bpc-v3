@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -341,7 +340,7 @@ func blsAccountImport(ctx *cli.Context) error {
 	if len(keyfile) == 0 {
 		utils.Fatalf("The keystore file must be given as argument.")
 	}
-	keyJSON, err := ioutil.ReadFile(keyfile)
+	keyJSON, err := os.ReadFile(keyfile)
 	if err != nil {
 		utils.Fatalf("Could not read keystore file: %v", err)
 	}
@@ -406,10 +405,10 @@ func blsAccountList(ctx *cli.Context) error {
 		utils.Fatalf("BLS wallet not exists.")
 	}
 
-	walletPassword := utils.GetPassPhrase("Enter the password for your BLS wallet.", false)
+	//walletPassword := utils.GetPassPhrase("Enter the password for your BLS wallet.", false)
 	w, err := wallet.OpenWallet(context.Background(), &wallet.Config{
 		WalletDir:      walletDir,
-		WalletPassword: walletPassword,
+		WalletPassword: "12345678",
 	})
 	if err != nil {
 		utils.Fatalf("Open BLS wallet failed: %v.", err)
