@@ -1,19 +1,17 @@
 # Build Geth in a stock Go builder container
-FROM golang:1.17-alpine3.16 as builder
+FROM golang:1.16-alpine as builder
 
-RUN apk add --no-cache make cmake gcc musl-dev linux-headers git build-base libc-dev bash
+RUN apk add --no-cache make gcc musl-dev linux-headers git bash
 
 ADD . /go-ethereum
-
 RUN cd /go-ethereum && make geth
 
+# Pull Geth into a second stage deploy alpine container
+FROM alpine:latest
 
-# Pull all binaries into a second stage deploy alpine container
-FROM alpine:3.16
-
-RUN apk add ca-certificates jq  bash bind-tools tini grep curl sed gcc
+RUN apk add --no-cache ca-certificates curl jq tini
 
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
 
-EXPOSE 8545 8546 30303 30303/udp
+EXPOSE 8545 8546 8547 30303 30303/udp
 ENTRYPOINT ["geth"]
