@@ -24,7 +24,7 @@ Usage: go run build/ci.go <command> <command flags/arguments>
 
 Available commands are:
 
-	install    [ -arch architecture ] [ -cc compiler ] [ packages... ]                          -- builds packages and executables
+	install    [ -arch architecture ] [-static] [ -cc compiler ] [ packages... ]                -- builds packages and executables
 	test       [ -coverage ] [ packages... ]                                                    -- runs the tests
 	lint                                                                                        -- runs certain pre-selected linters
 	archive    [ -arch architecture ] [ -type zip|tar ] [ -signer key-envvar ] [ -signify key-envvar ] [ -upload dest ] -- archives build artifacts
@@ -33,6 +33,7 @@ Available commands are:
 	nsis                                                                                        -- creates a Windows NSIS installer
 	aar        [ -local ] [ -sign key-id ] [-deploy repo] [ -upload dest ]                      -- creates an Android archive
 	xcode      [ -local ] [ -sign key-id ] [-deploy repo] [ -upload dest ]                      -- creates an iOS XCode framework
+	xgo        [ -alltools ] [-static] [ options ]                                              -- cross builds according to options
 	purge      [ -store blobstore ] [ -days threshold ]                                         -- purges old archives from the blobstore
 
 For all commands, -n prevents execution of external programs (dry run mode).
@@ -186,6 +187,8 @@ func main() {
 		doAndroidArchive(os.Args[2:])
 	case "xcode":
 		doXCodeFramework(os.Args[2:])
+	case "xgo":
+		doXgo(os.Args[2:])
 	case "purge":
 		doPurge(os.Args[2:])
 	default:
@@ -197,10 +200,10 @@ func main() {
 
 func doInstall(cmdline []string) {
 	var (
-		dlgo   = flag.Bool("dlgo", false, "Download Go and build with it")
-		arch   = flag.String("arch", "", "Architecture to cross build for")
-		cc     = flag.String("cc", "", "C compiler to cross build with")
-		output = flag.String("o", "", "Output directory for build artifacts")
+		dlgo       = flag.Bool("dlgo", false, "Download Go and build with it")
+		arch       = flag.String("arch", "", "Architecture to cross build for")
+		cc         = flag.String("cc", "", "C compiler to cross build with")
+		staticlink = flag.Bool("static", false, "Static link build with")
 	)
 	flag.CommandLine.Parse(cmdline)
 
@@ -211,10 +214,12 @@ func doInstall(cmdline []string) {
 		tc.Root = build.DownloadGo(csdb, dlgoVersion)
 	}
 
+	// Disable CLI markdown doc generation in release builds.
+	buildTags := []string{"urfave_cli_no_docs"}
+
 	// Configure the build.
 	env := build.Env()
-	buildArgs := buildFlags(env)
-	gobuild := tc.Go("build", buildArgs...)
+	gobuild := tc.Go("build", buildFlags(env, *staticlink, buildTags)...)
 
 	// arm64 CI builders are memory-constrained and can't handle concurrent builds,
 	// better disable it. This check isn't the best, it should probably
@@ -240,18 +245,14 @@ func doInstall(cmdline []string) {
 	for _, pkg := range packages {
 		args := make([]string, len(gobuild.Args))
 		copy(args, gobuild.Args)
-		outputPath := executablePath(path.Base(pkg))
-		if output != nil && *output != "" {
-			outputPath = *output
-		}
-		args = append(args, "-o", outputPath)
+		args = append(args, "-o", executablePath(path.Base(pkg)))
 		args = append(args, pkg)
 		build.MustRun(&exec.Cmd{Path: gobuild.Path, Args: args, Env: gobuild.Env})
 	}
 }
 
 // buildFlags returns the go tool flags for building.
-func buildFlags(env build.Environment) (flags []string) {
+func buildFlags(env build.Environment, staticLinking bool, buildTags []string) (flags []string) {
 	var ld []string
 	if env.Commit != "" {
 		ld = append(ld, "-X", "main.gitCommit="+env.Commit)
@@ -262,13 +263,25 @@ func buildFlags(env build.Environment) (flags []string) {
 	if runtime.GOOS == "darwin" {
 		ld = append(ld, "-s")
 	}
-	// Enforce the stacksize to 8M, which is the case on most platforms apart from
-	// alpine Linux.
 	if runtime.GOOS == "linux" {
-		ld = append(ld, "-extldflags", "-Wl,-z,stack-size=0x800000")
+		staticflag := ""
+		if staticLinking {
+			staticflag = " -static"
+			// Under static linking, use of certain glibc features must be
+			// disabled to avoid shared library dependencies.
+			buildTags = append(buildTags, "osusergo", "netgo")
+		}
+		// Enforce the stacksize to 8M, which is the case on most platforms apart from
+		// alpine Linux.
+		extflag := "'-Wl,-z,stack-size=0x800000" + staticflag + "'"
+		ld = append(ld, "-extldflags", extflag)
 	}
+
 	if len(ld) > 0 {
 		flags = append(flags, "-ldflags", strings.Join(ld, " "))
+	}
+	if len(buildTags) > 0 {
+		flags = append(flags, "-tags", strings.Join(buildTags, ","))
 	}
 	return flags
 }
@@ -316,7 +329,7 @@ func doTest(cmdline []string) {
 	packages := []string{"./accounts/...", "./common/...", "./consensus/...", "./console/...", "./core/...",
 		"./crypto/...", "./eth/...", "./ethclient/...", "./ethdb/...", "./event/...", "./graphql/...", "./les/...",
 		"./light/...", "./log/...", "./metrics/...", "./miner/...", "./mobile/...", "./node/...",
-		"./p2p/...", "./params/...", "./rlp/...", "./rpc/...", "./tests/...", "./trie/...", "./cmd/geth/..."}
+		"./p2p/...", "./params/...", "./rlp/...", "./rpc/...", "./tests/...", "./trie/..."}
 	if len(flag.CommandLine.Args()) > 0 {
 		packages = flag.CommandLine.Args()
 	}
@@ -343,21 +356,16 @@ func doLint(cmdline []string) {
 
 // downloadLinter downloads and unpacks golangci-lint.
 func downloadLinter(cachedir string) string {
-	const version = "1.52.2"
+	const version = "1.48.0"
 
 	csdb := build.MustLoadChecksums("build/checksums.txt")
 	arch := runtime.GOARCH
-	ext := ".tar.gz"
-
-	if runtime.GOOS == "windows" {
-		ext = ".zip"
-	}
 	if arch == "arm" {
 		arch += "v" + os.Getenv("GOARM")
 	}
 	base := fmt.Sprintf("golangci-lint-%s-%s-%s", version, runtime.GOOS, arch)
-	url := fmt.Sprintf("https://github.com/golangci/golangci-lint/releases/download/v%s/%s%s", version, base, ext)
-	archivePath := filepath.Join(cachedir, base+ext)
+	url := fmt.Sprintf("https://github.com/golangci/golangci-lint/releases/download/v%s/%s.tar.gz", version, base)
+	archivePath := filepath.Join(cachedir, base+".tar.gz")
 	if err := csdb.DownloadFile(url, archivePath); err != nil {
 		log.Fatal(err)
 	}
@@ -1225,6 +1233,52 @@ func newPodMetadata(env build.Environment, archive string) podMetadata {
 		Commit:       env.Commit,
 		Contributors: contribs,
 	}
+}
+
+// Cross compilation
+
+func doXgo(cmdline []string) {
+	var (
+		alltools   = flag.Bool("alltools", false, `Flag whether we're building all known tools, or only on in particular`)
+		staticlink = flag.Bool("static", false, "Static link build with")
+	)
+	flag.CommandLine.Parse(cmdline)
+	env := build.Env()
+	var tc build.GoToolchain
+
+	// Make sure xgo is available for cross compilation
+	build.MustRun(tc.Install(GOBIN, "github.com/karalabe/xgo@latest"))
+
+	// Disable CLI markdown doc generation in release builds.
+	buildTags := []string{"urfave_cli_no_docs"}
+
+	// If all tools building is requested, build everything the builder wants
+	args := append(buildFlags(env, *staticlink, buildTags), flag.Args()...)
+
+	if *alltools {
+		args = append(args, []string{"--dest", GOBIN}...)
+		for _, res := range allToolsArchiveFiles {
+			if strings.HasPrefix(res, GOBIN) {
+				// Binary tool found, cross build it explicitly
+				args = append(args, "./"+filepath.Join("cmd", filepath.Base(res)))
+				build.MustRun(xgoTool(args))
+				args = args[:len(args)-1]
+			}
+		}
+		return
+	}
+
+	// Otherwise execute the explicit cross compilation
+	path := args[len(args)-1]
+	args = append(args[:len(args)-1], []string{"--dest", GOBIN, path}...)
+	build.MustRun(xgoTool(args))
+}
+
+func xgoTool(args []string) *exec.Cmd {
+	cmd := exec.Command(filepath.Join(GOBIN, "xgo"), args...)
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, []string{"GOBIN=" + GOBIN}...)
+	return cmd
 }
 
 // Binary distribution cleanups
