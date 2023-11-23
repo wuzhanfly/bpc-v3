@@ -1450,6 +1450,7 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash, blockNum *big.Int) 
 
 	if !p.chainConfig.IsBoneh(blockNum) {
 		validators, err := p.getCurrentValidatorsBeforeBoneh(blockHash, blockNum)
+		
 		return validators, nil, err
 	}
 
