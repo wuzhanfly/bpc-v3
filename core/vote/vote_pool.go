@@ -24,7 +24,7 @@ const (
 	lowerLimitOfVoteBlockNumber = 256
 	upperLimitOfVoteBlockNumber = 11
 
-	chainHeadChanSize = 10 // chainHeadChanSize is the size of channel listening to ChainHeadEvent.
+	chainHeadChanSize = 20 // chainHeadChanSize is the size of channel listening to ChainHeadEvent.
 )
 
 var (
@@ -82,7 +82,7 @@ func NewVotePool(chainconfig *params.ChainConfig, chain *core.BlockChain, engine
 		engine:        engine,
 	}
 
-	// Subscribe events from blockchain and start the main event loop.
+	// Subscribe events from the blockchain and start the main event loop.
 	votePool.chainHeadSub = votePool.chain.SubscribeChainHeadEvent(votePool.chainHeadCh)
 
 	go votePool.loop()
@@ -103,7 +103,7 @@ func (pool *VotePool) loop() {
 		case <-pool.chainHeadSub.Err():
 			return
 
-		// Handle votes channel and put the vote into vote pool.
+		// Handle a votes channel and put the vote into vote pool.
 		case vote := <-pool.votesCh:
 			pool.putIntoVotePool(vote)
 		}
@@ -156,7 +156,7 @@ func (pool *VotePool) putIntoVotePool(vote *types.VoteEnvelope) bool {
 			return false
 		}
 
-		// Send vote for handler usage of broadcasting to peers.
+		// Send a vote for handler usage of broadcasting to peers.
 		voteEv := core.NewVoteEvent{Vote: vote}
 		pool.votesFeed.Send(voteEv)
 	}
@@ -179,8 +179,8 @@ func (pool *VotePool) putVote(m map[common.Hash]*VoteBox, votesPq *votesPriority
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 	if _, ok := m[targetHash]; !ok {
-		// Push into votes priorityQueue if not exist in corresponding votes Map.
-		// To be noted: will not put into priorityQueue if exists in map to avoid duplicate element with the same voteData.
+		// Push into votes priorityQueue if not exist in the corresponding votes Map.
+		// To be noted: will not put into priorityQueue if it exists in a map to avoid a duplicate element with the same voteData.
 		heap.Push(votesPq, voteData)
 		voteBox := &VoteBox{
 			blockNumber:  targetNumber,
@@ -195,9 +195,9 @@ func (pool *VotePool) putVote(m map[common.Hash]*VoteBox, votesPq *votesPriority
 		}
 	}
 
-	// Put into corresponding votes map.
+	// Put into a corresponding votes map.
 	m[targetHash].voteMessages = append(m[targetHash].voteMessages, vote)
-	// Add into received vote to avoid future duplicated vote comes.
+	// Add into a received vote to avoid a future duplicated vote comes.
 	pool.receivedVotes.Add(voteHash)
 	log.Debug("VoteHash put into votepool is:", "voteHash", voteHash)
 
@@ -259,7 +259,7 @@ func (pool *VotePool) transfer(blockHash common.Hash) {
 			continue
 		}
 
-		// In the process of transfer, send valid vote to votes channel for handler usage
+		// In the process of transfer, send a valid vote to vote channel for handler usage
 		voteEv := core.NewVoteEvent{Vote: vote}
 		pool.votesFeed.Send(voteEv)
 		validVotes = append(validVotes, vote)
@@ -279,7 +279,7 @@ func (pool *VotePool) transfer(blockHash common.Hash) {
 	localFutureVotesGauge.Dec(int64(len(voteBox.voteMessages)))
 }
 
-// Prune old data of duplicationSet, curVotePq and curVotesMap.
+// Prune old data of duplicationSet, curVotePq, and curVotesMap.
 func (pool *VotePool) prune(latestBlockNumber uint64) {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()

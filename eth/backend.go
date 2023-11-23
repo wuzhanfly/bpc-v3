@@ -98,7 +98,7 @@ type Ethereum struct {
 
 	p2pServer *p2p.Server
 
-	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
+	lock sync.RWMutex // Protects the variadic fields (e.g., gas price and etherbase)
 
 	votePool *vote.VotePool
 }
@@ -231,8 +231,8 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	blsPasswordPath := conf.BLSPasswordFile
 
 	blsWalletPath := filepath.Join(conf.DataDir, conf.BLSWalletDir)
+
 	log.Info(blsPasswordPath, conf.DataDir, conf.BLSWalletDir)
-	//blsWalletPath := conf.BLSWalletDir
 	voteJournalPath := stack.ResolvePath(conf.VoteJournalDir)
 
 	// Create voteManager instance

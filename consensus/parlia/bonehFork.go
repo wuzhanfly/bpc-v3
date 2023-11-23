@@ -45,5 +45,6 @@ func (p *Parlia) getCurrentValidatorsBeforeBoneh(blockHash common.Hash, blockNum
 
 	var valSet []common.Address
 	err = p.validatorSetABIBeforeBoneh.UnpackIntoInterface(&valSet, method, result)
+
 	return valSet, err
 }

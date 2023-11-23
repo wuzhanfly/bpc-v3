@@ -128,7 +128,7 @@ func (voteManager *VoteManager) loop() {
 				Data: vote,
 			}
 
-			// Put Vote into journal and VotesPool if we are active validator and allow to sign it.
+			// Put Vote into journal and VotesPool if we are an active validator and allow to sign it.
 			if ok, sourceNumber, sourceHash := voteManager.UnderRules(curHead); ok {
 				log.Debug("curHead is underRules for voting")
 				if sourceHash == (common.Hash{}) {

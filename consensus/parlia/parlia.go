@@ -1479,6 +1479,7 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash, blockNum *big.Int) 
 
 	var valSet []common.Address
 	var voteAddrSet []types.BLSPublicKey
+	var newValidatorsString []string
 
 	if err := p.validatorSetABI.UnpackIntoInterface(&[]interface{}{&valSet, &voteAddrSet}, method, result); err != nil {
 		return nil, nil, err
@@ -1487,7 +1488,9 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash, blockNum *big.Int) 
 	voteAddrmap := make(map[common.Address]*types.BLSPublicKey, len(valSet))
 	for i := 0; i < len(valSet); i++ {
 		voteAddrmap[valSet[i]] = &(voteAddrSet)[i]
+		newValidatorsString = append(newValidatorsString, valSet[i].Hex())
 	}
+	log.Info("Updating validator set", "validator", strings.Join(newValidatorsString, ","))
 	return valSet, voteAddrmap, nil
 }
 
