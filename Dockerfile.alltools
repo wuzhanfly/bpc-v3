@@ -22,16 +22,9 @@ RUN cd /go-ethereum && go run build/ci.go install ./cmd/geth
 # Pull Geth into a second stage deploy alpine container
 FROM alpine:3.17
 
-ENV PACKAGES ca-certificates jq \
-  bash bind-tools tini \
-  grep curl sed gcc
-
-RUN apk add --no-cache $PACKAGES \
+RUN apk add --no-cache ca-certificates jq bash bind-tools tini grep curl sed gcc
 
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
-
-RUN mkdir -p ${DATA_DIR} \
-    && chown -R ${BSC_USER_UID}:${BSC_USER_GID} ${BSC_HOME} ${DATA_DIR}
 
 # rpc ws graphql
 EXPOSE 8545 8546 8547 30303 30303/udp
