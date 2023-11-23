@@ -25,7 +25,7 @@ FROM alpine:3.17
 RUN apk add --no-cache ca-certificates jq bash bind-tools tini grep curl sed gcc
 
 COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
-
+RUN chmod +x /usr/local/bin/geth
 # rpc ws graphql
 EXPOSE 8545 8546 8547 30303 30303/udp
 
