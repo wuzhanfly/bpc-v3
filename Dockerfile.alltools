@@ -33,7 +33,7 @@ COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
 # rpc ws graphql
 EXPOSE 8545 8546 8547 30303 30303/udp
 
-ENTRYPOINT ["geth"]
+ENTRYPOINT ["/sbin/tini", "--","/usr/local/bin/geth"]
 
 # Add some metadata labels to help programatic image consumption
 ARG COMMIT=""
