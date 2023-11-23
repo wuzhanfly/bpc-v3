@@ -1,8 +1,3 @@
-# Support setting various labels on the final image
-ARG COMMIT=""
-ARG VERSION=""
-ARG BUILDNUM=""
-
 # Build Geth in a stock Go builder container
 FROM golang:1.17-alpine as builder
 
@@ -17,7 +12,7 @@ ADD . /go-ethereum
 # For blst
 ENV CGO_CFLAGS="-O -D__BLST_PORTABLE__"
 ENV CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
-RUN cd /go-ethereum && go run build/ci.go install ./cmd/geth
+RUN cd /go-ethereum && make geth
 
 # Pull Geth into a second stage deploy alpine container
 FROM alpine:3.17
@@ -33,11 +28,4 @@ COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/
 # rpc ws graphql
 EXPOSE 8545 8546 8547 30303 30303/udp
 
-ENTRYPOINT ["/sbin/tini", "--","/usr/local/bin/geth"]
-
-# Add some metadata labels to help programatic image consumption
-ARG COMMIT=""
-ARG VERSION=""
-ARG BUILDNUM=""
-
-LABEL commit="$COMMIT" version="$VERSION" buildnum="$BUILDNUM"
+ENTRYPOINT ["geth"]
