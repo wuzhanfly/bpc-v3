@@ -7,7 +7,7 @@ RUN apk add --no-cache make cmake gcc musl-dev linux-headers git bash build-base
 ADD . /go-ethereum
 
 # For blst
-RUN cd /go-ethereum && make geth
+RUN cd /go-ethereum && make all-static
 
 # Pull Geth into a second stage deploy alpine container
 FROM alpine:latest
