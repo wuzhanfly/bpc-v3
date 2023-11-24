@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - v2
 
   pull_request:
     types:
@@ -69,7 +70,7 @@ jobs:
                 }
             }
         env:
-          PACKAGE_NAME: "bpc-template-bsc-v3"
+          PACKAGE_NAME: "bpc-v3"
           PER_PAGE: 99
     
       # https://github.com/orgs/community/discussions/26716
@@ -91,6 +92,6 @@ jobs:
                 }
             }
         env:
-          PACKAGE_NAME: "bpc-template-bsc-v3"
+          PACKAGE_NAME: "bpc-v3"
           PER_PAGE: 99
   
