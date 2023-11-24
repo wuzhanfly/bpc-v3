@@ -1450,7 +1450,7 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash, blockNum *big.Int) 
 
 	if !p.chainConfig.IsBoneh(blockNum) {
 		validators, err := p.getCurrentValidatorsBeforeBoneh(blockHash, blockNum)
-		
+
 		return validators, nil, err
 	}
 
@@ -1496,6 +1496,7 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash, blockNum *big.Int) 
 }
 
 func (p *Parlia) BlockRewards(blockNumber *big.Int) *big.Int {
+	log.Info("BlockRewards:", p.chainConfig.Parlia.BlockRewards.String())
 	if rules := p.chainConfig.Rules(blockNumber); rules.HasBlockRewards {
 		blockRewards := p.chainConfig.Parlia.BlockRewards
 		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
@@ -1516,6 +1517,14 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
 	rewards := big.NewInt(0).Abs(balance)
+	blockRewards := p.BlockRewards(header.Number)
+	if blockRewards != nil {
+		rewards = rewards.Add(rewards, blockRewards)
+		state.AddBalance(coinbase, blockRewards)
+	}
+	if rewards.Cmp(common.Big0) <= 0 {
+		return nil
+	}
 	if rules := p.chainConfig.Rules(header.Number); rules.HasBlockRewards {
 		blockRewards := p.chainConfig.Parlia.BlockRewards
 		// if we have enabled block rewards and rewards are greater than 0 then
