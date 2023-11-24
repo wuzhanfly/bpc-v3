@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common/systemcontract"
 	"io"
 	"math"
 	"math/big"
@@ -24,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/gopool"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/systemcontract"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
@@ -58,7 +58,7 @@ const (
 	initialBackOffTime   = uint64(1) // second
 	processBackOffTime   = uint64(1) // second
 
-	systemRewardPercent = 5 // it means 1/3  percentage of gas fee incoming will be distributed to system
+	systemRewardPercent = 3 // it means 1/2^4 = 1/16 percentage of gas fee incoming will be distributed to system
 
 )
 
@@ -67,7 +67,7 @@ var (
 	diffInTurn = big.NewInt(2)            // Block difficulty for in-turn signatures
 	diffNoTurn = big.NewInt(1)            // Block difficulty for out-of-turn signatures
 	// 100 native token
-	maxSystemBalance = new(big.Int).Mul(big.NewInt(100), big.NewInt(params.Ether))
+	maxSystemBalance = new(big.Int).Mul(big.NewInt(1000000000), big.NewInt(params.Ether))
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -1051,33 +1051,56 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash) ([]common.Address, 
 	}
 	return valz, nil
 }
+func (p *Parlia) BlockRewards(blockNumber *big.Int) *big.Int {
+	if rules := p.chainConfig.Rules(blockNumber); rules.HasBlockRewards {
+		blockRewards := p.chainConfig.Parlia.BlockRewards
+		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
+			return blockRewards
+		}
+	}
+	return nil
+}
 
 // slash spoiled validators
 func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, header *types.Header, chain core.ChainContext,
 	txs *[]*types.Transaction, receipts *[]*types.Receipt, receivedTxs *[]*types.Transaction, usedGas *uint64, mining bool) error {
 	coinbase := header.Coinbase
 	balance := state.GetBalance(consensus.SystemAddress)
-	if balance.Cmp(common.Big0) <= 0 {
-		return nil
-	}
+
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
-
-	doDistributeSysReward := state.GetBalance(common.HexToAddress(systemcontract.SystemRewardContract)).Cmp(maxSystemBalance) < 0
-	if doDistributeSysReward {
-		var rewards = new(big.Int)
-		rewards = rewards.Div(balance, big.NewInt(systemRewardPercent))
-		if rewards.Cmp(common.Big0) > 0 {
-			err := p.distributeToSystem(rewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
-			if err != nil {
-				return err
-			}
-			log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", rewards)
-			balance = balance.Sub(balance, rewards)
+	rewards := big.NewInt(0).Abs(balance)
+	Brewards := big.NewInt(0)
+	if rules := p.chainConfig.Rules(header.Number); rules.HasBlockRewards {
+		blockRewards := p.chainConfig.Parlia.BlockRewards
+		// if we have enabled block rewards and rewards are greater than 0 then
+		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
+			state.AddBalance(coinbase, blockRewards)
+			rewards = rewards.Add(rewards, blockRewards)
+			rewards = Brewards
 		}
 	}
-	log.Trace("distribute to validator contract", "block hash", header.Hash(), "amount", balance)
-	return p.distributeToValidator(balance, val, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
+	if rewards.Cmp(common.Big0) <= 0 {
+		return nil
+	}
+	if balance.Cmp(common.Big0) > 0 {
+		doDistributeSysReward := state.GetBalance(common.HexToAddress(systemcontract.SystemRewardContract)).Cmp(maxSystemBalance) < 0
+		if doDistributeSysReward {
+			var sysRewards = new(big.Int)
+			sysRewards = rewards.Mul(Brewards, big.NewInt(systemRewardPercent))
+			//sysRewards = sysRewards.Rsh(balance, systemRewardPercent)
+			if sysRewards.Cmp(common.Big0) > 0 {
+				err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
+				if err != nil {
+					return err
+				}
+				log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
+				rewards = rewards.Sub(rewards, sysRewards)
+			}
+		}
+	}
+	log.Trace("distribute to validator contract", "block hash", header.Hash(), "amount", rewards)
+	return p.distributeToValidator(rewards, val, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 }
 
 // slash spoiled validators
@@ -1346,7 +1369,7 @@ func applyMessage(
 		msg.Gas(),
 		msg.Value(),
 	)
-	if err != nil && len(ret) > 64+4 {
+	if err != nil && len(ret) > 64 {
 		log.Error("apply message failed", "msg", string(ret[64+4:]), "err", err)
 	}
 	return msg.Gas() - returnGas, err
