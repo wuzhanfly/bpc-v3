@@ -58,7 +58,7 @@ const (
 	initialBackOffTime   = uint64(1) // second
 	processBackOffTime   = uint64(1) // second
 
-	systemRewardPercent = 5 // it means 1/3  percentage of gas fee incoming will be distributed to system
+	systemRewardPercent = 3 // it means 1/3  percentage of gas fee incoming will be distributed to system
 
 )
 
@@ -1081,18 +1081,15 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	}
 
 	if rewards.Cmp(common.Big0) > 0 {
-		doDistributeSysReward := state.GetBalance(common.HexToAddress(systemcontract.SystemRewardContract)).Cmp(maxSystemBalance) < 0
-		if doDistributeSysReward {
-			var sysRewards = new(big.Int)
-			sysRewards = sysRewards.Rsh(rewards, systemRewardPercent)
-			if sysRewards.Cmp(common.Big0) > 0 {
-				err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
-				if err != nil {
-					return err
-				}
-				log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
-				rewards = rewards.Sub(rewards, sysRewards)
+		var sysRewards = new(big.Int)
+		sysRewards = sysRewards.Rsh(rewards, systemRewardPercent)
+		if sysRewards.Cmp(common.Big0) > 0 {
+			err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
+			if err != nil {
+				return err
 			}
+			log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
+			rewards = rewards.Sub(rewards, sysRewards)
 		}
 	}
 	log.Trace("distribute to validator contract", "block hash", header.Hash(), "amount", rewards)
