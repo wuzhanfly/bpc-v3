@@ -28,18 +28,18 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-	RopstenGenesisHash = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
-	RinkebyGenesisHash = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
-	GoerliGenesisHash  = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
+	MainnetGenesisHash = common.HexToHash("")
+	RopstenGenesisHash = common.HexToHash("")
+	RinkebyGenesisHash = common.HexToHash("")
+	GoerliGenesisHash  = common.HexToHash("")
 
-	BSCGenesisHash    = common.HexToHash("0x0d21840abff46b96c84b2ac9e10e4f5cdaeb5693cb665db62a2f3b02d2d57b5b")
-	ChapelGenesisHash = common.HexToHash("0x6d3c66c5357ec91d5c43af47e234a939b22557cbb552dc45bebbceeed90fbe34")
-	RialtoGenesisHash = common.HexToHash("0xaabe549bfa85c84f7aee9da7010b97453ad686f2c2d8ce00503d1a00c72cad54")
-	YoloV3GenesisHash = common.HexToHash("0xf1f2876e8500c77afcc03228757b39477eceffccf645b734967fe3c7e16967b7")
+	BSCGenesisHash    = common.HexToHash("")
+	ChapelGenesisHash = common.HexToHash("")
+	RialtoGenesisHash = common.HexToHash("")
+	YoloV3GenesisHash = common.HexToHash("")
 
-	ChilizScovilleGenesisHash = common.HexToHash("0xa148378fbfd7562cd43c8622d20ad056b735fdc0f968f56d0033294c33ededf2")
-	ChilizSpicyGenesisHash    = common.HexToHash("0x9e0e07ae4ee9b0ef66a4206656677020306259d0b0b845ad3bb6b09fb91485ff")
+	ChilizScovilleGenesisHash = common.HexToHash("")
+	ChilizSpicyGenesisHash    = common.HexToHash("")
 	ChilizMainnetGenesisHash  = common.HexToHash("")
 )
 
@@ -358,6 +358,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
+		nil,
 		new(EthashConfig),
 		nil, nil,
 	}
@@ -391,6 +392,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		nil,
+		nil,
 		&CliqueConfig{Period: 0, Epoch: 30000},
 		nil,
 	}
@@ -418,6 +420,7 @@ var (
 		big.NewInt(0),
 		big.NewInt(0),
 		big.NewInt(0),
+		nil,
 		new(EthashConfig),
 		nil, nil,
 	}
@@ -510,11 +513,11 @@ type ChainConfig struct {
 	EWASMBlock    *big.Int `json:"ewasmBlock,omitempty"`    // EWASM switch block (nil = no fork, 0 = already activated)	RamanujanBlock      *big.Int `json:"ramanujanBlock,omitempty" toml:",omitempty"`      // ramanujanBlock switch block (nil = no fork, 0 = already activated)
 	CatalystBlock *big.Int `json:"catalystBlock,omitempty"` // Catalyst switch block (nil = no fork, 0 = already on catalyst)
 
-	RamanujanBlock  *big.Int `json:"ramanujanBlock,omitempty" toml:",omitempty"`  // ramanujanBlock switch block (nil = no fork, 0 = already activated)
-	NielsBlock      *big.Int `json:"nielsBlock,omitempty" toml:",omitempty"`      // nielsBlock switch block (nil = no fork, 0 = already activated)
-	MirrorSyncBlock *big.Int `json:"mirrorSyncBlock,omitempty" toml:",omitempty"` // mirrorSyncBlock switch block (nil = no fork, 0 = already activated)
-	BrunoBlock      *big.Int `json:"brunoBlock,omitempty" toml:",omitempty"`      // brunoBlock switch block (nil = no fork, 0 = already activated)
-
+	RamanujanBlock    *big.Int `json:"ramanujanBlock,omitempty" toml:",omitempty"`  // ramanujanBlock switch block (nil = no fork, 0 = already activated)
+	NielsBlock        *big.Int `json:"nielsBlock,omitempty" toml:",omitempty"`      // nielsBlock switch block (nil = no fork, 0 = already activated)
+	MirrorSyncBlock   *big.Int `json:"mirrorSyncBlock,omitempty" toml:",omitempty"` // mirrorSyncBlock switch block (nil = no fork, 0 = already activated)
+	BrunoBlock        *big.Int `json:"brunoBlock,omitempty" toml:",omitempty"`      // brunoBlock switch block (nil = no fork, 0 = already activated)
+	BlockRewardsBlock *big.Int `json:"blockRewardsBlock,omitempty" toml:",omitempty"`
 	// Various consensus engines
 	Ethash *EthashConfig `json:"ethash,omitempty" toml:",omitempty"`
 	Clique *CliqueConfig `json:"clique,omitempty" toml:",omitempty"`
@@ -542,8 +545,9 @@ func (c *CliqueConfig) String() string {
 
 // ParliaConfig is the consensus engine configs for proof-of-staked-authority based sealing.
 type ParliaConfig struct {
-	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
-	Epoch  uint64 `json:"epoch"`  // Epoch length to update validatorSet
+	Period       uint64   `json:"period"`       // Number of seconds between blocks to enforce
+	Epoch        uint64   `json:"epoch"`        // Epoch length to update validatorSet
+	BlockRewards *big.Int `json:"blockRewards"` // Block rewards to be paid for each produced block
 }
 
 // String implements the stringer interface, returning the consensus engine details.
@@ -692,6 +696,10 @@ func (c *ChainConfig) IsCatalyst(num *big.Int) bool {
 // IsEWASM returns whether num represents a block number after the EWASM fork
 func (c *ChainConfig) IsEWASM(num *big.Int) bool {
 	return isForked(c.EWASMBlock, num)
+}
+
+func (c *ChainConfig) IsBlockRewardsBlock(num *big.Int) bool {
+	return isForked(c.BlockRewardsBlock, num)
 }
 
 // CheckCompatible checks whether scheduled fork transitions have been imported
@@ -874,6 +882,7 @@ type Rules struct {
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsCatalyst                                    bool
+	HasBlockRewards                                         bool
 	// features
 	HasRuntimeUpgrade    bool
 	HasDeployOrigin      bool
@@ -899,6 +908,7 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		IsIstanbul:       c.IsIstanbul(num),
 		IsBerlin:         c.IsBerlin(num),
 		IsCatalyst:       c.IsCatalyst(num),
+		HasBlockRewards:  c.IsBlockRewardsBlock(num),
 		// features
 		HasRuntimeUpgrade:    isForked(c.RuntimeUpgradeBlock, num),
 		HasDeployOrigin:      isForked(c.DeployOriginBlock, num),
