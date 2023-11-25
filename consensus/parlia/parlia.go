@@ -1079,7 +1079,8 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	}
 
 	var sysRewards = new(big.Int)
-	sysRewards = sysRewards.Mod(blockRewards, big.NewInt(systemRewardPercent))
+
+	sysRewards = sysRewards.Mul(blockRewards, big.NewInt(systemRewardPercent))
 	//sysRewards = sysRewards.Rsh(rewards, systemRewardPercent)
 	err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 	if err != nil {
