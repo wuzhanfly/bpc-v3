@@ -1215,7 +1215,7 @@ func (s *PublicBlockChainAPI) replay(ctx context.Context, block *types.Block, ac
 		}
 
 		if !skip {
-			// Record account balance
+			// Record-account balance
 			for _, account := range accounts {
 				diffTx.Accounts[account] = statedb.GetBalance(account)
 			}

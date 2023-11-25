@@ -1066,28 +1066,25 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	txs *[]*types.Transaction, receipts *[]*types.Receipt, receivedTxs *[]*types.Transaction, usedGas *uint64, mining bool) error {
 	coinbase := header.Coinbase
 	balance := state.GetBalance(consensus.SystemAddress)
-	if balance.Cmp(common.Big0) <= 0 {
-		return nil
-	}
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
 	rewards := big.NewInt(0).Abs(balance)
-	if rules := p.chainConfig.Rules(header.Number); rules.HasBlockRewards {
-		blockRewards := p.chainConfig.Parlia.BlockRewards
-		// if we have enabled block rewards and rewards are greater than 0 then
-		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
-			state.AddBalance(coinbase, blockRewards)
-			rewards = rewards.Add(rewards, blockRewards)
-		}
+	blockRewards := p.BlockRewards(header.Number)
+	if blockRewards != nil {
+		rewards = rewards.Add(rewards, blockRewards)
+		state.AddBalance(coinbase, blockRewards)
 	}
+	log.Info("blockRewards:", blockRewards, "rewards:", rewards)
+
 	if rewards.Cmp(common.Big0) <= 0 {
 		return nil
 	}
-	if balance.Cmp(common.Big0) > 0 {
+
+	if rewards.Cmp(common.Big0) > 0 {
 		doDistributeSysReward := state.GetBalance(common.HexToAddress(systemcontract.SystemRewardContract)).Cmp(maxSystemBalance) < 0
 		if doDistributeSysReward {
 			var sysRewards = new(big.Int)
-			sysRewards = sysRewards.Rsh(balance, systemRewardPercent)
+			sysRewards = sysRewards.Rsh(rewards, systemRewardPercent)
 			if sysRewards.Cmp(common.Big0) > 0 {
 				err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 				if err != nil {
