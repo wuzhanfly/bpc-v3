@@ -1076,6 +1076,7 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
 	rewards := big.NewInt(0).Abs(balance)
+	log.Debug("hhh:", header.Number.String())
 	blockRewards := p.BlockRewards(header.Number)
 	if blockRewards != nil {
 		rewards = rewards.Add(rewards, blockRewards)

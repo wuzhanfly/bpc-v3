@@ -700,7 +700,7 @@ func (c *ChainConfig) IsEWASM(num *big.Int) bool {
 }
 
 func (c *ChainConfig) IsBlockRewardsBlock(num *big.Int) bool {
-	log.Debug("c.BlockRewardsBlock, num:", c.BlockRewardsBlock, num, isForked(c.BlockRewardsBlock, num))
+	log.Debug("c.BlockRewardsBlock, num:", c.BlockRewardsBlock.String(), num.String(), isForked(c.BlockRewardsBlock, num))
 	return isForked(c.BlockRewardsBlock, num)
 }
 
