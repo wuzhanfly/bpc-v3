@@ -1074,7 +1074,7 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 		rewards = rewards.Add(rewards, blockRewards)
 		state.AddBalance(coinbase, blockRewards)
 	}
-	log.Info("blockRewards:", blockRewards, "rewards:", rewards)
+	log.Info("blockRewards:", blockRewards.String(), "rewards:", rewards.String())
 
 	if rewards.Cmp(common.Big0) <= 0 {
 		return nil
