@@ -19,6 +19,7 @@ package params
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/ethereum/go-ethereum/log"
 	"math/big"
 
 	"golang.org/x/crypto/sha3"
@@ -699,6 +700,7 @@ func (c *ChainConfig) IsEWASM(num *big.Int) bool {
 }
 
 func (c *ChainConfig) IsBlockRewardsBlock(num *big.Int) bool {
+	log.Debug("c.BlockRewardsBlock, num:", c.BlockRewardsBlock, num, isForked(c.BlockRewardsBlock, num))
 	return isForked(c.BlockRewardsBlock, num)
 }
 

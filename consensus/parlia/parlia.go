@@ -1053,7 +1053,8 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash) ([]common.Address, 
 }
 func (p *Parlia) BlockRewards(blockNumber *big.Int) *big.Int {
 	rules := p.chainConfig.Rules(blockNumber)
-	log.Info("p.chainConfig.Parlia.BlockRewards:", p.chainConfig.Parlia.BlockRewards.String(), "rules.HasBlockRewards:", rules.HasBlockRewards, p.config.BlockRewards)
+	p.chainConfig.BlockRewardsBlock.String()
+	log.Info("p.chainConfig.Parlia.BlockRewards:", p.chainConfig.Parlia.BlockRewards.String(), "p.chainConfig.BlockRewardsBlock.String():", p.chainConfig.BlockRewardsBlock.String(), "rules.HasBlockRewards:", rules.HasBlockRewards)
 
 	if rules.HasBlockRewards {
 		blockRewards := p.chainConfig.Parlia.BlockRewards
