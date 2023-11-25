@@ -1052,12 +1052,18 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash) ([]common.Address, 
 	return valz, nil
 }
 func (p *Parlia) BlockRewards(blockNumber *big.Int) *big.Int {
-	if rules := p.chainConfig.Rules(blockNumber); rules.HasBlockRewards {
+	rules := p.chainConfig.Rules(blockNumber)
+	log.Info("p.chainConfig.Parlia.BlockRewards:", p.chainConfig.Parlia.BlockRewards.String(), "rules.HasBlockRewards:", rules.HasBlockRewards, p.config.BlockRewards)
+
+	if rules.HasBlockRewards {
 		blockRewards := p.chainConfig.Parlia.BlockRewards
 		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
 			return blockRewards
 		}
 	}
+	//if rules := p.chainConfig.Rules(blockNumber); rules.HasBlockRewards {
+	//
+	//}
 	return nil
 }
 
