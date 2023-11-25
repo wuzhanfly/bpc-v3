@@ -1052,19 +1052,10 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash) ([]common.Address, 
 	return valz, nil
 }
 func (p *Parlia) BlockRewards(blockNumber *big.Int) *big.Int {
-	rules := p.chainConfig.Rules(blockNumber)
-	p.chainConfig.BlockRewardsBlock.String()
-	log.Info("p.chainConfig.Parlia.BlockRewards:", p.chainConfig.Parlia.BlockRewards.String(), "p.chainConfig.BlockRewardsBlock.String():", p.chainConfig.BlockRewardsBlock.String(), "rules.HasBlockRewards:", rules.HasBlockRewards)
-
-	if rules.HasBlockRewards {
-		blockRewards := p.chainConfig.Parlia.BlockRewards
-		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
-			return blockRewards
-		}
+	blockRewards := p.chainConfig.Parlia.BlockRewards
+	if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
+		return blockRewards
 	}
-	//if rules := p.chainConfig.Rules(blockNumber); rules.HasBlockRewards {
-	//
-	//}
 	return nil
 }
 
@@ -1076,30 +1067,26 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
 	rewards := big.NewInt(0).Abs(balance)
-	log.Debug("hhh:", header.Number.String())
 	blockRewards := p.BlockRewards(header.Number)
 	if blockRewards != nil {
-		rewards = rewards.Add(rewards, blockRewards)
 		state.AddBalance(coinbase, blockRewards)
+		rewards = rewards.Add(rewards, blockRewards)
+		rewards = rewards.Add(rewards, blockRewards)
+		state.AddBalance(coinbase, rewards)
 	}
-	log.Info("blockRewards:", blockRewards.String(), "rewards:", rewards.String())
-
 	if rewards.Cmp(common.Big0) <= 0 {
 		return nil
 	}
 
-	if rewards.Cmp(common.Big0) > 0 {
-		var sysRewards = new(big.Int)
-		sysRewards = sysRewards.Rsh(rewards, systemRewardPercent)
-		if sysRewards.Cmp(common.Big0) > 0 {
-			err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
-			if err != nil {
-				return err
-			}
-			log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
-			rewards = rewards.Sub(rewards, sysRewards)
-		}
+	var sysRewards = new(big.Int)
+	sysRewards = sysRewards.Mod(blockRewards, big.NewInt(systemRewardPercent))
+	//sysRewards = sysRewards.Rsh(rewards, systemRewardPercent)
+	err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
+	if err != nil {
+		return err
 	}
+	log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
+	//rewards = rewards.Sub(rewards, sysRewards)
 	log.Trace("distribute to validator contract", "block hash", header.Hash(), "amount", rewards)
 	return p.distributeToValidator(rewards, val, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 }
@@ -1180,13 +1167,13 @@ func (p *Parlia) distributeToValidator(amount *big.Int, validator common.Address
 		log.Error("Unable to pack tx for deposit", "error", err)
 		return err
 	}
-	// get system message
+	// get a system message
 	msg := p.getSystemMessage(header.Coinbase, common.HexToAddress(systemcontract.ValidatorContract), data, amount)
 	// apply message
 	return p.applyTransaction(msg, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 }
 
-// get system message
+// get a system message
 func (p *Parlia) getSystemMessage(from, toAddress common.Address, data []byte, value *big.Int) callmsg {
 	return callmsg{
 		ethereum.CallMsg{
