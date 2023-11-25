@@ -67,7 +67,7 @@ var (
 	diffInTurn = big.NewInt(2)            // Block difficulty for in-turn signatures
 	diffNoTurn = big.NewInt(1)            // Block difficulty for out-of-turn signatures
 	// 100 native token
-	maxSystemBalance = new(big.Int).Mul(big.NewInt(1000000000), big.NewInt(params.Ether))
+	maxSystemBalance = new(big.Int).Mul(big.NewInt(100), big.NewInt(params.Ether))
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -1066,29 +1066,28 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	txs *[]*types.Transaction, receipts *[]*types.Receipt, receivedTxs *[]*types.Transaction, usedGas *uint64, mining bool) error {
 	coinbase := header.Coinbase
 	balance := state.GetBalance(consensus.SystemAddress)
-
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
 	rewards := big.NewInt(0).Abs(balance)
-	Brewards := big.NewInt(0)
 	if rules := p.chainConfig.Rules(header.Number); rules.HasBlockRewards {
 		blockRewards := p.chainConfig.Parlia.BlockRewards
 		// if we have enabled block rewards and rewards are greater than 0 then
 		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
 			state.AddBalance(coinbase, blockRewards)
 			rewards = rewards.Add(rewards, blockRewards)
-			rewards = Brewards
 		}
 	}
 	if rewards.Cmp(common.Big0) <= 0 {
+		log.Info("blockRewards is nill", rewards)
 		return nil
 	}
+
 	if balance.Cmp(common.Big0) > 0 {
 		doDistributeSysReward := state.GetBalance(common.HexToAddress(systemcontract.SystemRewardContract)).Cmp(maxSystemBalance) < 0
 		if doDistributeSysReward {
 			var sysRewards = new(big.Int)
-			sysRewards = rewards.Mul(Brewards, big.NewInt(systemRewardPercent))
-			//sysRewards = sysRewards.Rsh(balance, systemRewardPercent)
+
+			sysRewards = sysRewards.Rsh(balance, systemRewardPercent)
 			if sysRewards.Cmp(common.Big0) > 0 {
 				err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 				if err != nil {
@@ -1117,7 +1116,7 @@ func (p *Parlia) slash(spoiledVal common.Address, state *state.StateDB, header *
 		log.Error("Unable to pack tx for slash", "error", err)
 		return err
 	}
-	// get system message
+	// get a system message
 	msg := p.getSystemMessage(header.Coinbase, common.HexToAddress(systemcontract.SlashContract), data, common.Big0)
 	// apply message
 	return p.applyTransaction(msg, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
@@ -1158,7 +1157,7 @@ func (p *Parlia) initContract(state *state.StateDB, header *types.Header, chain 
 
 func (p *Parlia) distributeToSystem(amount *big.Int, state *state.StateDB, header *types.Header, chain core.ChainContext,
 	txs *[]*types.Transaction, receipts *[]*types.Receipt, receivedTxs *[]*types.Transaction, usedGas *uint64, mining bool) error {
-	// get system message
+	// get a system message
 	msg := p.getSystemMessage(header.Coinbase, common.HexToAddress(systemcontract.SystemRewardContract), nil, amount)
 	// apply message
 	return p.applyTransaction(msg, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
@@ -1179,13 +1178,13 @@ func (p *Parlia) distributeToValidator(amount *big.Int, validator common.Address
 		log.Error("Unable to pack tx for deposit", "error", err)
 		return err
 	}
-	// get system message
+	// get a system message
 	msg := p.getSystemMessage(header.Coinbase, common.HexToAddress(systemcontract.ValidatorContract), data, amount)
 	// apply message
 	return p.applyTransaction(msg, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 }
 
-// get system message
+// get a system message
 func (p *Parlia) getSystemMessage(from, toAddress common.Address, data []byte, value *big.Int) callmsg {
 	return callmsg{
 		ethereum.CallMsg{
