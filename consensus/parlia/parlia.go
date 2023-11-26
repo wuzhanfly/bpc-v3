@@ -1052,9 +1052,11 @@ func (p *Parlia) getCurrentValidators(blockHash common.Hash) ([]common.Address, 
 	return valz, nil
 }
 func (p *Parlia) BlockRewards(blockNumber *big.Int) *big.Int {
-	blockRewards := p.chainConfig.Parlia.BlockRewards
-	if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
-		return blockRewards
+	if rules := p.chainConfig.Rules(blockNumber); rules.HasBlockRewards {
+		blockRewards := p.chainConfig.Parlia.BlockRewards
+		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
+			return blockRewards
+		}
 	}
 	return nil
 }
@@ -1067,19 +1069,22 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
 	rewards := big.NewInt(0).Abs(balance)
-	blockRewards := p.BlockRewards(header.Number)
-	if blockRewards != nil {
-		rewards = rewards.Add(rewards, blockRewards)
-		state.AddBalance(coinbase, rewards)
+	fmt.Println("re:", p.chainConfig.Parlia.BlockRewards)
+	if rules := p.chainConfig.Rules(header.Number); rules.HasBlockRewards {
+		blockRewards := p.chainConfig.Parlia.BlockRewards
+		// if we have enabled block rewards and rewards are greater than 0 then
+		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
+			state.AddBalance(coinbase, blockRewards)
+			rewards = rewards.Add(rewards, blockRewards)
+		}
 	}
 	if rewards.Cmp(common.Big0) <= 0 {
 		return nil
 	}
+	if balance.Cmp(common.Big0) > 0 {
 
-	if rewards.Cmp(common.Big0) > 0 {
 		var sysRewards = new(big.Int)
-		sysRewards = sysRewards.Mod(blockRewards, big.NewInt(systemRewardPercent))
-		//sysRewards = sysRewards.Rsh(rewards, systemRewardPercent)
+		sysRewards = sysRewards.Rsh(balance, systemRewardPercent)
 		if sysRewards.Cmp(common.Big0) > 0 {
 			err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 			if err != nil {

@@ -19,7 +19,6 @@ package params
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/ethereum/go-ethereum/log"
 	"math/big"
 
 	"golang.org/x/crypto/sha3"
@@ -700,7 +699,6 @@ func (c *ChainConfig) IsEWASM(num *big.Int) bool {
 }
 
 func (c *ChainConfig) IsBlockRewardsBlock(num *big.Int) bool {
-	log.Debug("c.BlockRewardsBlock, num:", c.BlockRewardsBlock.String(), num.String(), isForked(c.BlockRewardsBlock, num))
 	return isForked(c.BlockRewardsBlock, num)
 }
 
@@ -827,9 +825,11 @@ func isForkIncompatible(s1, s2, head *big.Int) bool {
 
 // isForked returns whether a fork scheduled at block s is active at the given head block.
 func isForked(s, head *big.Int) bool {
+	fmt.Println("c.BlockRewardsBlock, num:", s.String(), head.String())
 	if s == nil || head == nil {
 		return false
 	}
+	fmt.Println(s.Cmp(head) <= 0)
 	return s.Cmp(head) <= 0
 }
 
