@@ -1069,8 +1069,6 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	rewards := big.NewInt(0).Abs(balance)
 	blockRewards := p.BlockRewards(header.Number)
 	if blockRewards != nil {
-		state.AddBalance(coinbase, blockRewards)
-		rewards = rewards.Add(rewards, blockRewards)
 		rewards = rewards.Add(rewards, blockRewards)
 		state.AddBalance(coinbase, rewards)
 	}
@@ -1078,16 +1076,19 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 		return nil
 	}
 
-	var sysRewards = new(big.Int)
-
-	sysRewards = sysRewards.Mul(blockRewards, big.NewInt(systemRewardPercent))
-	//sysRewards = sysRewards.Rsh(rewards, systemRewardPercent)
-	err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
-	if err != nil {
-		return err
+	if rewards.Cmp(common.Big0) > 0 {
+		var sysRewards = new(big.Int)
+		sysRewards = sysRewards.Mod(blockRewards, big.NewInt(systemRewardPercent))
+		//sysRewards = sysRewards.Rsh(rewards, systemRewardPercent)
+		if sysRewards.Cmp(common.Big0) > 0 {
+			err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
+			if err != nil {
+				return err
+			}
+			log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
+			rewards = rewards.Sub(rewards, sysRewards)
+		}
 	}
-	log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
-	//rewards = rewards.Sub(rewards, sysRewards)
 	log.Trace("distribute to validator contract", "block hash", header.Hash(), "amount", rewards)
 	return p.distributeToValidator(rewards, val, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 }
@@ -1168,13 +1169,13 @@ func (p *Parlia) distributeToValidator(amount *big.Int, validator common.Address
 		log.Error("Unable to pack tx for deposit", "error", err)
 		return err
 	}
-	// get a system message
+	// get system message
 	msg := p.getSystemMessage(header.Coinbase, common.HexToAddress(systemcontract.ValidatorContract), data, amount)
 	// apply message
 	return p.applyTransaction(msg, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 }
 
-// get a system message
+// get system message
 func (p *Parlia) getSystemMessage(from, toAddress common.Address, data []byte, value *big.Int) callmsg {
 	return callmsg{
 		ethereum.CallMsg{
