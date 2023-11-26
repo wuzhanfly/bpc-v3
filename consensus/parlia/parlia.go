@@ -1096,6 +1096,7 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 		var sysRewards = new(big.Int)
 		blockReward = blockReward.Mul(blockReward, big.NewInt(systemRewardPercent))
 		sysRewards = sysRewards.Add(sysRewardsFee, blockReward)
+		fmt.Println(sysRewards.String())
 		if sysRewards.Cmp(common.Big0) > 0 {
 			err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 			if err != nil {
