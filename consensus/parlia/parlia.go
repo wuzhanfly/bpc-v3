@@ -1069,7 +1069,6 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
 	rewards := big.NewInt(0).Abs(balance)
-	fmt.Println("re:", p.chainConfig.Parlia.BlockRewards)
 	if rules := p.chainConfig.Rules(header.Number); rules.HasBlockRewards {
 		blockRewards := p.chainConfig.Parlia.BlockRewards
 		// if we have enabled block rewards and rewards are greater than 0 then
