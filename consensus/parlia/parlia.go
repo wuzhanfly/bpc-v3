@@ -1071,35 +1071,29 @@ func (p *Parlia) distributeIncoming(val common.Address, state *state.StateDB, he
 	state.SetBalance(consensus.SystemAddress, big.NewInt(0))
 	state.AddBalance(coinbase, balance)
 	rewards := big.NewInt(0).Abs(balance)
-	if rules := p.chainConfig.Rules(header.Number); rules.HasBlockRewards {
-		blockRewards := p.chainConfig.Parlia.BlockRewards
-		// if we have enabled block rewards and rewards are greater than 0 then
-		if blockRewards != nil && blockRewards.Cmp(common.Big0) > 0 {
-			state.AddBalance(coinbase, blockRewards)
-			rewards = rewards.Add(rewards, blockRewards)
-		}
+	blockRewards := p.BlockRewards(header.Number)
+	if blockRewards != nil {
+		rewards = rewards.Add(rewards, blockRewards)
+		state.AddBalance(coinbase, blockRewards)
 	}
 	if rewards.Cmp(common.Big0) <= 0 {
 		log.Info("blockRewards is nill", rewards)
 		return nil
 	}
-
-	if balance.Cmp(common.Big0) > 0 {
-		doDistributeSysReward := state.GetBalance(common.HexToAddress(systemcontract.SystemRewardContract)).Cmp(maxSystemBalance) < 0
-		if doDistributeSysReward {
-			var sysRewards = new(big.Int)
-
-			sysRewards = sysRewards.Rsh(balance, systemRewardPercent)
-			if sysRewards.Cmp(common.Big0) > 0 {
-				err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
-				if err != nil {
-					return err
-				}
-				log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
-				rewards = rewards.Sub(rewards, sysRewards)
-			}
+	var sysRewardsBlock = new(big.Int)
+	var sysRewardsFee = new(big.Int)
+	sysRewardsBlock = sysRewardsBlock.Mul(blockRewards, big.NewInt(systemRewardPercent))
+	sysRewardsFee = sysRewardsFee.Rsh(balance, systemRewardPercent)
+	if sysRewardsBlock.Cmp(common.Big0) > 0 {
+		var sysRewards = new(big.Int)
+		sysRewards = sysRewards.Add(sysRewardsBlock, sysRewardsFee)
+		err := p.distributeToSystem(sysRewards, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
+		if err != nil {
+			return err
 		}
+		log.Trace("distribute to system reward pool", "block hash", header.Hash(), "amount", sysRewards)
 	}
+	rewards = rewards.Sub(rewards, sysRewardsFee)
 	log.Trace("distribute to validator contract", "block hash", header.Hash(), "amount", rewards)
 	return p.distributeToValidator(rewards, val, state, header, chain, txs, receipts, receivedTxs, usedGas, mining)
 }
