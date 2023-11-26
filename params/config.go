@@ -486,11 +486,9 @@ func isForkIncompatible(s1, s2, head *big.Int) bool {
 
 // isForked returns whether a fork scheduled at block s is active at the given head block.
 func isForked(s, head *big.Int) bool {
-	fmt.Println(s.String(), head.String())
 	if s == nil || head == nil {
 		return false
 	}
-	fmt.Println(s.Cmp(head) <= 0)
 	return s.Cmp(head) <= 0
 }
 
