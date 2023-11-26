@@ -486,9 +486,11 @@ func isForkIncompatible(s1, s2, head *big.Int) bool {
 
 // isForked returns whether a fork scheduled at block s is active at the given head block.
 func isForked(s, head *big.Int) bool {
+	fmt.Println(s.String(), head.String())
 	if s == nil || head == nil {
 		return false
 	}
+	fmt.Println(s.Cmp(head) <= 0)
 	return s.Cmp(head) <= 0
 }
 
@@ -543,8 +545,8 @@ type Rules struct {
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
 	IsBerlin, IsCatalyst                                    bool
-	HasRuntimeUpgrade, HasDeployerProxy bool
-	HasBlockRewards      bool
+	HasRuntimeUpgrade, HasDeployerProxy                     bool
+	HasBlockRewards                                         bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -554,19 +556,19 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 		chainID = new(big.Int)
 	}
 	return Rules{
-		ChainID:              new(big.Int).Set(chainID),
-		IsHomestead:          c.IsHomestead(num),
-		IsEIP150:             c.IsEIP150(num),
-		IsEIP155:             c.IsEIP155(num),
-		IsEIP158:             c.IsEIP158(num),
-		IsByzantium:          c.IsByzantium(num),
-		IsConstantinople:     c.IsConstantinople(num),
-		IsPetersburg:         c.IsPetersburg(num),
-		IsIstanbul:           c.IsIstanbul(num),
-		IsBerlin:             c.IsBerlin(num),
-		IsCatalyst:           c.IsCatalyst(num),
-		HasRuntimeUpgrade:    c.HasRuntimeUpgrade(num),
-		HasDeployerProxy:     c.HasDeployerProxy(num),
-		HasBlockRewards:      c.IsBlockRewardsBlock(num),
+		ChainID:           new(big.Int).Set(chainID),
+		IsHomestead:       c.IsHomestead(num),
+		IsEIP150:          c.IsEIP150(num),
+		IsEIP155:          c.IsEIP155(num),
+		IsEIP158:          c.IsEIP158(num),
+		IsByzantium:       c.IsByzantium(num),
+		IsConstantinople:  c.IsConstantinople(num),
+		IsPetersburg:      c.IsPetersburg(num),
+		IsIstanbul:        c.IsIstanbul(num),
+		IsBerlin:          c.IsBerlin(num),
+		IsCatalyst:        c.IsCatalyst(num),
+		HasRuntimeUpgrade: c.HasRuntimeUpgrade(num),
+		HasDeployerProxy:  c.HasDeployerProxy(num),
+		HasBlockRewards:   c.IsBlockRewardsBlock(num),
 	}
 }
